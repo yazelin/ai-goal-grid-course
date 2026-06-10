@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 7 章 — AI 編輯迴圈與降級設計 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<style>
+:root{--ink:#0e1420;--panel:#141c2b;--gold:#c9a44e;--paper:#f2ede2;
+  --dim:rgba(242,237,226,.66);--line:rgba(201,164,78,.22)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--paper);line-height:1.95;font-size:1.02rem;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  padding:0 20px 72px}
+.top{max-width:760px;margin:0 auto;padding:26px 0 18px;display:flex;
+  justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+.top a{color:var(--gold);text-decoration:none;font-size:.9rem}
+.top .crumb{color:var(--dim);font-size:.82rem;letter-spacing:.18em}
+article{max-width:760px;margin:0 auto;padding-top:10px}
+h1,h2,h3,h4{font-family:"Noto Serif TC","PMingLiU",serif;line-height:1.5;color:var(--paper)}
+article>h1{font-size:1.65rem;margin:28px 0 18px;padding-bottom:12px;
+  border-bottom:2px solid var(--gold)}
+h2{font-size:1.28rem;margin:40px 0 12px;color:var(--gold)}
+h3{font-size:1.08rem;margin:28px 0 10px}
+p,ul,ol{margin:12px 0;color:var(--paper)}
+ul,ol{padding-left:1.6em}
+li{margin:6px 0}
+a{color:var(--gold)}
+blockquote{margin:18px 0;padding:10px 18px;border-left:3px solid var(--gold);
+  background:var(--panel);color:var(--dim);border-radius:0 8px 8px 0}
+pre{background:#0a0f18;border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.7;
+  font-family:"JetBrains Mono","Courier New",monospace;color:#e8e2d4}
+code{font-family:"JetBrains Mono","Courier New",monospace;font-size:.9em;
+  background:var(--panel);padding:1px 6px;border-radius:5px}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--panel);color:var(--gold)}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+.pager{max-width:760px;margin:48px auto 0;display:flex;justify-content:space-between;
+  gap:12px;border-top:1px solid var(--line);padding-top:18px;font-size:.94rem}
+.pager a{text-decoration:none}
+.pager .ph{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="crumb">COURSE</span>
+  <span><a href="index.html">章節目錄</a> · <a href="../">課程首頁</a> · <a href="../app/">成品 App</a></span>
+</div>
+<article>
+<h1>模組 7 — AI 編輯迴圈與降級設計:prompt 是可攜帶的資產</h1>
+<h2>學完能做什麼</h2>
+<ul>
+<li>讓使用者用一句自然語言修改 AI 背景(「整體亮一點,天空加一點晚霞」),而不是整張重抽碰運氣。</li>
+<li>善用上一章「背景與文字解耦」的紅利:改文字、換配色即時重繪,零等待、零成本。</li>
+<li>設計一條零後端依賴的降級路徑:服務忙線或沒設金鑰時,「複製生圖 prompt」讓使用者自己去 ChatGPT/Gemini 生,「匯入背景圖」把成品帶回來繼續合成——行銷頁永遠走得完。</li>
+</ul>
+<h2>核心觀念:迭代有兩種,成本差一千倍</h2>
+<p>使用者拿到第一張桌布,幾乎一定會想改。這時要分清楚改的是哪一層:</p>
+<ul>
+<li><strong>改背景</strong>:要重新生圖,快則數十秒(OpenAI 主路)、慢則兩三分鐘(自架備援),扣一次額度。</li>
+<li><strong>改文字、換風格配色</strong>:只是 canvas 重繪,不到 0.1 秒,免費,可以改一百次。</li>
+</ul>
+<p>上一章把「AI 畫背景、canvas 畫字」拆成兩層,紅利就在這裡兌現:貴的迭代與便宜的迭代被分開了,使用者可以放心玩文字,只有真的不滿意背景時才動用生圖額度。</p>
+<p>至於「修改背景」是怎麼運作的——先打破一個錯覺:<strong>生圖 API 沒有記憶</strong>。你在 ChatGPT 裡說「再亮一點」它聽得懂,是因為對話介面幫你把上一張圖帶著;直接呼叫 API 時,所謂「編輯」其實是「把上一張圖當參考圖附上 + 在 prompt 裡加一句修改要求,整張重新生成」。理解這件事,後面的程式碼就都顯而易見了。</p>
+<h2>步驟</h2>
+<p>以下程式碼取自成品 <code>app/js/api.js</code> 與 <code>app/js/main.js</code>(有簡化,邏輯一致)。</p>
+<h3>1. edit 模式的請求長什麼樣</h3>
+<p>跟模組 5 的生成請求只差兩件事:prompt 多一行「修改要求」、參考圖欄位帶上一張背景。<code>app/js/api.js</code> 的 <code>submitWallpaper</code> 是這樣組的:</p>
+<pre><code class="language-js">// 原始 prompt 照舊用同一個模板組(風格詞、構圖約束、禁文字鐵律都還在)
+let prompt = imagePrompt(req.goal, req.subGoals, presetById(req.styleId).words, req.orientation);
+
+// 修改模式:把使用者那句話接在後面,明說「套用在上一版設計上」
+if (req.editInstruction) {
+  prompt += `\nRevision request from the user (apply it to the previous design): ${req.editInstruction}`;
+}
+
+const payload = {
+  prompt,
+  size: req.orientation === 'portrait' ? '1024x1536' : '1536x1024',
+};
+// 上一張背景圖放進參考圖欄位(純 base64,去掉 data: 前綴)
+if (req.referenceImagesBase64 &amp;&amp; req.referenceImagesBase64.length) {
+  payload.reference_images_base64 = req.referenceImagesBase64;
+}
+</code></pre>
+<p>注意:<strong>原始 prompt 一個字都沒少</strong>。如果只送「亮一點」三個字,模型就失去了風格與構圖的所有上下文,生出來的會是另一張不相干的圖。</p>
+<h3>2. 把上一張背景帶上(縮圖再上傳)</h3>
+<p>上一張背景在生成成功時已經存進 IndexedDB(模組 5),修改時撈出來、縮小、轉 base64:</p>
+<pre><code class="language-js">// main.js:editInstruction 有值 = 修改模式
+if (editInstruction &amp;&amp; bgRecord) {
+  referenceImagesBase64.push(
+    await blobToBase64(await resizeImageBlob(bgRecord.blob, 1280)),
+  );
+}
+</code></pre>
+<p>兩個工具函式都在上一章的 <code>wallpaper.js</code> 裡:<code>resizeImageBlob</code> 把長邊縮到 1280(原圖直接 base64 會把請求撐爆,伺服器有 20MB 上限),<code>blobToBase64</code> 轉完會把 <code>data:image/jpeg;base64,</code> 前綴去掉——上游 API 要的是純 base64。</p>
+<p>送出之後走哪條路,跟模組 5 的三層一樣由 Worker 決定:主路(OpenAI)上,帶參考圖的請求會改打官方的 <code>/v1/images/edits</code> 端點(文生圖才是 <code>/v1/images/generations</code>),一樣同步回圖;自架備援路徑才是同一個 job 端點、同一套輪詢、同一條進度條。對 Worker 來說「生成」與「修改」是同一件事——差別只在有沒有參考圖。</p>
+<h3>3. 文字迭代零成本:只重繪,不重生</h3>
+<p>這層幾乎不用寫新程式碼——因為背景圖(<code>bgBitmap</code>)還在手上,任何文字或配色改動只要重跑一次上一章的 <code>renderWallpaper</code>:</p>
+<pre><code class="language-js">function rerenderWallpaper() {
+  renderWallpaper(wallCanvas, {
+    bgBitmap,                      // 背景不變,不重新生圖
+    cells: state.cells,
+    actions: state.actions,
+    styleId: state.wallpaper.styleId,
+    orientation: state.wallpaper.orientation,
+    mode: wallpaperMode,
+  });
+}
+</code></pre>
+<p>成品在背景生成完成時,直接把這條規則講給使用者聽:</p>
+<blockquote>
+<p>背景完成。不滿意可以輸入修改指示重生背景;改文字或換風格則即時重繪、不用重生。</p>
+</blockquote>
+<p>這句話就是本章的 UX 核心:把「貴的路」和「免費的路」明白地標出來,使用者自然會把額度花在刀口上。</p>
+<h2>prompt 是可攜帶的資產:降級設計</h2>
+<p>接下來這節是本章真正想教的行銷頁設計觀。</p>
+<p>想一個問題:生圖服務在排隊(<code>queue_full</code>)、站方金鑰沒設(<code>not_configured</code>)、或今天額度用完了——使用者walk away,漏斗就斷在這裡。大多數網站的答案是一句「請稍後再試」,等於送客。</p>
+<p>但回頭看第 1 步:我們手上其實握著一份完整的、品質很好的生圖 prompt——風格詞、構圖約束、主題意象,全是現成的。這份 prompt 不是只有自家後端能用,<strong>貼到 ChatGPT 或 Gemini 一樣能生</strong>,而使用者多半本來就有這些帳號。</p>
+<p>所以降級路徑是兩個純前端按鈕,零後端依賴。成品把它們收在步驟四一個「服務忙線或想自己生?」的摺疊面板(<code>&lt;details&gt;</code>)裡,生圖出錯時自動展開:</p>
+<h3>(a) 複製生圖 prompt</h3>
+<p>用前端那份相同的 <code>imagePrompt</code> 模板(<code>app/js/prompts.js</code> 與 Worker 端逐字同步,BYO 直連時走的就是它)組出完整 prompt,補一句長寬比提示(外面的工具不吃 <code>size: '1024x1536'</code> 這種 API 參數,要用人話講),一鍵複製:</p>
+<pre><code class="language-js">import { imagePrompt } from './prompts.js';
+import { presetById } from './styles-presets.js';
+
+function buildPortablePrompt(goal, subGoals, styleId, orientation, editInstruction) {
+  let p = imagePrompt(goal, subGoals, presetById(styleId).words, orientation);
+  if (editInstruction) {
+    p += `\nRevision request from the user (apply it to the previous design): ${editInstruction}`;
+  }
+  // API 參數換成人話:長寬比提示
+  p += orientation === 'portrait'
+    ? '\nAspect ratio 2:3, vertical phone wallpaper.'
+    : '\nAspect ratio 3:2, horizontal desktop wallpaper.';
+  return p;
+}
+
+copyBtn.addEventListener('click', async () =&gt; {
+  await navigator.clipboard.writeText(buildPortablePrompt(
+    core.text, subGoals, state.wallpaper.styleId, state.wallpaper.orientation, null,
+  ));
+  showMsg(bgMsgEl, '已複製。貼到 ChatGPT 或 Gemini 生成,參考圖自己附上,生好的圖用下方「匯入背景圖」帶回來。', 'ok');
+});
+</code></pre>
+<p>引導文案要把三步講完:貼過去生 → 下載圖 → 帶回來。使用者上傳過的參考照片在他自己手上,叫他直接附給 ChatGPT 即可——這條路上連參考圖都不用經過我們。</p>
+<h3>(b) 匯入背景圖</h3>
+<p>一個檔案上傳框,把使用者自己生好的圖收回來當背景:</p>
+<pre><code class="language-js">importInput.addEventListener('change', async () =&gt; {
+  const file = importInput.files[0];
+  if (!file) return;
+  try {
+    bgBitmap = await createImageBitmap(file);
+    // 跟 AI 生成的背景同等對待:存進 IndexedDB,標記來源是手動匯入
+    bgRecord = {
+      blob: file,
+      meta: { source: 'manual', styleId: state.wallpaper.styleId,
+              orientation: state.wallpaper.orientation },
+      createdAt: new Date().toISOString(),
+    };
+    bgRecord.id = await idbPut('wallpapers', bgRecord);
+    rerenderWallpaper(); // cover 裁切吃任何比例,直接重繪
+  } catch {
+    showMsg(bgMsgEl, '這張圖讀不進來,請換一張(支援一般圖片格式)。');
+  }
+});
+</code></pre>
+<p>不用檢查圖的長寬比——上一章的 <code>coverRect</code> 本來就吃任何比例,置中裁滿。匯入後的圖跟 AI 生的背景走完全相同的後續流程:文字合成、即時重繪、下載 PNG,連「修改背景」都能接著用(它會被當成下一輪的參考圖)。</p>
+<p>最後一塊拼圖:<strong>錯誤訊息要把這條路標成主要出路</strong>。<code>not_configured</code>、<code>queue_full</code>、額度用完、生成逾時——這些錯誤面板上,第一順位的建議不是「稍後再試」,而是「複製生圖 prompt 自己生,生好匯入回來」。服務掛掉的瞬間,頁面從「壞掉的產品」變成「換一條路的產品」。</p>
+<p>這就是「prompt 是可攜帶的資產」的意思:你花心思調出來的 prompt 模板,價值不綁死在自家後端上。後端是加速器(免操作、有額度管理),不是必經之路;漏斗的最後一步——下載桌布、留 email——永遠走得到。</p>
+<h2>給 AI 的 prompt 範本</h2>
+<p>在模組 6 成品的基礎上加功能,貼給 ChatGPT 或 Claude:</p>
+<pre><code class="language-text">我有一個九宮格桌布合成頁(canvas 把文字疊在背景圖上),請加三個功能:
+
+【修改背景】背景生成成功後,顯示一個輸入框加「修改背景」按鈕。按下時:
+1. 沿用原本那份完整的生圖 prompt,在最後面加一行:
+   &quot;Revision request from the user (apply it to the previous design): &quot; +
+   使用者輸入的修改句
+2. 把目前這張背景圖縮到長邊 1280 的 JPEG、轉 base64(去掉 data: 前綴),
+   放進請求的 reference_images_base64 陣列
+3. 之後走跟初次生成完全相同的送出與輪詢流程
+另外:改九宮格文字或換風格時只重繪 canvas,絕不重新生圖。
+
+【複製生圖 prompt】一顆按鈕,把完整生圖 prompt(含風格描述與構圖約束)
+組出來,結尾補一行長寬比提示(直式 &quot;Aspect ratio 2:3, vertical phone
+wallpaper.&quot; / 橫式 &quot;Aspect ratio 3:2, horizontal desktop wallpaper.&quot;),
+用 navigator.clipboard.writeText 複製;若 clipboard 不可用(非 https 或
+file:// 開啟),退而把 prompt 顯示在一個唯讀 textarea 讓使用者自己全選
+複製。按鈕旁附引導文案:「貼到 ChatGPT 或 Gemini 生成,參考圖自己附,
+生好的圖用『匯入背景圖』帶回來」。
+
+【匯入背景圖】一個檔案上傳框,選圖後 createImageBitmap 當作背景,
+cover 置中裁切鋪滿畫布重繪(任何長寬比都收),後續文字合成、下載 PNG
+照常運作。
+
+【錯誤處理】生圖服務回傳「未配置」「排隊滿」「額度用完」「逾時」時,
+錯誤訊息的第一建議是「複製生圖 prompt 自己生成,再匯入回來」,
+而不是只說稍後再試。
+
+【驗收】
+1. 修改背景後,新圖看得出保留原構圖氛圍且套用了修改句。
+2. 改文字後畫面瞬間更新,Network 面板沒有任何生圖請求。
+3. 完全離線:複製 prompt(或 textarea 後備)、匯入圖、改字重繪、
+   下載 PNG 全部可用。
+4. 匯入一張正方形的圖配直式畫布:鋪滿、置中裁切、不變形。
+</code></pre>
+<h2>常見坑</h2>
+<ol>
+<li><strong>以為 AI 記得上一張圖</strong>:對話式工具寵壞了我們。API 是無狀態的——不附參考圖的「修改」等於完全重抽,跟上一張一點關係都沒有。</li>
+<li><strong>只送修改句、丟掉原 prompt</strong>:風格詞與構圖約束(含「不准畫字」鐵律)全在原 prompt 裡,修改句是追加,不是取代。</li>
+<li><strong>參考圖沒縮就上傳</strong>:手機原圖好幾 MB,三張 base64 直接撐爆請求(伺服器 20MB 上限)。先縮長邊 1280 再轉。</li>
+<li><strong>base64 忘了去前綴</strong>:<code>reference_images_base64</code> 要的是純 base64,<code>data:image/jpeg;base64,</code> 開頭的字串會被上游拒絕。</li>
+<li><strong>clipboard API 默默失敗</strong>:<code>navigator.clipboard</code> 在非 https 頁面或拿檔案直接開(file://)時可能不可用。降級路徑自己也要有降級:備一個唯讀 textarea。</li>
+<li><strong>降級路徑藏太深</strong>:做了複製與匯入,卻只放在頁面角落,錯誤訊息照樣只說「稍後再試」——使用者看不到出口等於沒有出口。出錯的當下就要把路指出來。</li>
+<li><strong>匯入的圖比例不合就拒收</strong>:不必。cover 裁切吃任何比例;頂多在引導文案提醒「跟 ChatGPT 要 2:3 直式,裁掉的部分會少一點」。</li>
+</ol>
+<h2>對照成品</h2>
+<ul>
+<li><code>app/</code>:步驟四的完整體驗——「AI 修改背景」輸入框、「複製生圖 prompt」與「匯入背景圖」都在,試著故意不設金鑰走一次降級路徑,看錯誤面板怎麼引導你。</li>
+<li><code>demos/03-wallpaper/</code>:本章的合成底盤(模組 6 的成品),匯入背景圖後接著玩文字重繪,就能體會「貴的迭代」與「免費的迭代」差在哪。</li>
+</ul>
+</article>
+<nav class="pager"><a href="06-canvas-compose.html">← 第 6 章 — canvas 文字合成</a><a href="08-quota.html">第 8 章 — 防刷與額度 →</a></nav>
+</body>
+</html>

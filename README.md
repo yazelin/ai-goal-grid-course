@@ -12,6 +12,8 @@
 
 - 成品 App:https://yazelin.github.io/ai-goal-grid-course/app/
 - 課程入口:https://yazelin.github.io/ai-goal-grid-course/
+- 課程章節:https://yazelin.github.io/ai-goal-grid-course/course/
+- 講義 PDF:https://yazelin.github.io/ai-goal-grid-course/handout.pdf
 - 簡報:https://yazelin.github.io/ai-goal-grid-course/slides/
 
 ## 內容
@@ -19,7 +21,7 @@
 | 資料夾 | 內容 |
 |---|---|
 | `app/` | 完整成品(可直接玩、可雙擊離線開) |
-| `course/` | 11 章 + 銜接章 markdown 課程 |
+| `course/` | 13 章課程(HTML 線上閱讀 + markdown 原始檔) |
 | `slides/` | 各章 HTML 簡報 |
 | `demos/` | 各章階段性半成品(漸進建造同一個 app) |
 

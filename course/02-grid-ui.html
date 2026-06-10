@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 2 章 — 九宮格 UI 與資料模型 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<style>
+:root{--ink:#0e1420;--panel:#141c2b;--gold:#c9a44e;--paper:#f2ede2;
+  --dim:rgba(242,237,226,.66);--line:rgba(201,164,78,.22)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--paper);line-height:1.95;font-size:1.02rem;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  padding:0 20px 72px}
+.top{max-width:760px;margin:0 auto;padding:26px 0 18px;display:flex;
+  justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+.top a{color:var(--gold);text-decoration:none;font-size:.9rem}
+.top .crumb{color:var(--dim);font-size:.82rem;letter-spacing:.18em}
+article{max-width:760px;margin:0 auto;padding-top:10px}
+h1,h2,h3,h4{font-family:"Noto Serif TC","PMingLiU",serif;line-height:1.5;color:var(--paper)}
+article>h1{font-size:1.65rem;margin:28px 0 18px;padding-bottom:12px;
+  border-bottom:2px solid var(--gold)}
+h2{font-size:1.28rem;margin:40px 0 12px;color:var(--gold)}
+h3{font-size:1.08rem;margin:28px 0 10px}
+p,ul,ol{margin:12px 0;color:var(--paper)}
+ul,ol{padding-left:1.6em}
+li{margin:6px 0}
+a{color:var(--gold)}
+blockquote{margin:18px 0;padding:10px 18px;border-left:3px solid var(--gold);
+  background:var(--panel);color:var(--dim);border-radius:0 8px 8px 0}
+pre{background:#0a0f18;border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.7;
+  font-family:"JetBrains Mono","Courier New",monospace;color:#e8e2d4}
+code{font-family:"JetBrains Mono","Courier New",monospace;font-size:.9em;
+  background:var(--panel);padding:1px 6px;border-radius:5px}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--panel);color:var(--gold)}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+.pager{max-width:760px;margin:48px auto 0;display:flex;justify-content:space-between;
+  gap:12px;border-top:1px solid var(--line);padding-top:18px;font-size:.94rem}
+.pager a{text-decoration:none}
+.pager .ph{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="crumb">COURSE</span>
+  <span><a href="index.html">章節目錄</a> · <a href="../">課程首頁</a> · <a href="../app/">成品 App</a></span>
+</div>
+<article>
+<h1>第 02 章 — 九宮格 UI 與資料模型</h1>
+<h2>學完能做什麼</h2>
+<ul>
+<li>做出一個 3×3 九宮格填寫頁:中央是核心目標、周圍八格是子目標,每格都能打字。</li>
+<li>設計一個讓 AI 之後接得上手的資料模型:「null = 留給 AI;有字 = 使用者的,不准動」。</li>
+<li>讓填寫內容即時存進 localStorage:關頁、重新整理都不會丟。</li>
+</ul>
+<h2>核心觀念:畫面是畫面,資料是資料</h2>
+<p>這章開始動手蓋產品,但第一課不是「怎麼畫九宮格」,而是「資料跟畫面分開」。畫面是九個 textarea;資料是一個長度 9 的陣列,活在 JS 變數裡、備份在 localStorage。畫面隨時可以砍掉重畫,資料才是本體 —— 之後每一章(AI 補格、展開 81 格、桌布合成)都是對這個陣列做事,不是對畫面做事。</p>
+<p>資料模型裡還藏著整個產品最重要的一條約定:每一格的值要嘛是 <code>null</code>,要嘛是 <code>{text, source}</code>。<code>null</code> 不是「沒資料」,是一個明確的指令 ——「這格留給 AI」。<code>source</code> 記錄這格是 <code>'user'</code> 還是 <code>'ai'</code> 填的;下一章 AI 補格的鐵律「使用者寫的一字不改」,就是靠這個欄位才執行得了。用行銷的話說:「尊重使用者輸入」這個產品承諾,直接寫進了資料結構。</p>
+<h2>步驟</h2>
+<h3>1. 用 CSS Grid 排出 3×3</h3>
+<p>九宮格不需要任何畫布或框架,CSS Grid 一行就排好:</p>
+<pre><code class="language-css">.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cell {
+  border: 1px solid #2c3a52;
+  border-radius: 12px;
+  background: rgba(8, 12, 20, 0.62);
+}
+.cell-core { border-color: #c9a44e; }   /* 中央格用金色強調 */
+.cell textarea {
+  display: block; width: 100%; min-height: 96px;
+  background: transparent; border: 0; outline: none; resize: none;
+  color: #e8ecf4; font-size: 14px; line-height: 1.55; text-align: center;
+  padding: 1.45rem 0.5rem 0.6rem;
+}
+</code></pre>
+<p><code>repeat(3, 1fr)</code> 的意思是「三欄、每欄等寬」。手機上不用寫任何 media query,3×3 天生就是窄螢幕友善的版型。HTML 端只需要一個空容器:</p>
+<pre><code class="language-html">&lt;div class=&quot;grid3&quot; id=&quot;grid3&quot;&gt;&lt;/div&gt;
+</code></pre>
+<h3>2. 定義資料模型:null = 留給 AI</h3>
+<pre><code class="language-js">const STATE_KEY = 'goal-grid-state-v1';
+
+function defaultState() {
+  return {
+    version: 1,
+    // 長度 9 的陣列,index 4 = 中央核心目標
+    // 每格:null(留給 AI)或 {text, source:'user'|'ai'}
+    cells: Array(9).fill(null),
+    updatedAt: new Date().toISOString(),
+  };
+}
+</code></pre>
+<p>兩個設計眼:<code>version: 1</code> 讓你之後改格式時,認得出舊資料、不會被它弄壞;<code>index 4 = 核心目標</code> 是因為九格由左到右、由上到下編號 0 到 8,正中央剛好是 4。</p>
+<h3>3. 讀寫 localStorage</h3>
+<pre><code class="language-js">function loadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (raw &amp;&amp; raw.version === 1 &amp;&amp; Array.isArray(raw.cells)) return raw;
+  } catch { /* 資料壞了就當沒存過 */ }
+  return defaultState();
+}
+
+function saveState(state) {
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+}
+
+function setCell(state, idx, text, source = 'user') {
+  const t = String(text ?? '').trim();
+  state.cells[idx] = t ? { text: t, source } : null;   // 清空 = 還給 AI
+  state.updatedAt = new Date().toISOString();
+  saveState(state);
+}
+</code></pre>
+<p><code>setCell</code> 是唯一的寫入口:trim 之後是空字串,就把該格寫回 <code>null</code> ——「把字刪光」等於「這格還給 AI」。所有寫入都走同一個函式,存檔就不會漏。</p>
+<h3>4. 畫出九宮格,用 dataset.idx 對位</h3>
+<pre><code class="language-js">const state = loadState();
+const grid = document.getElementById('grid3');
+
+for (let i = 0; i &lt; 9; i++) {
+  const cell = document.createElement('div');
+  cell.className = i === 4 ? 'cell cell-core' : 'cell';
+
+  const ta = document.createElement('textarea');
+  ta.dataset.idx = String(i);                 // 畫面第 i 格 ←→ state.cells[i]
+  ta.placeholder = i === 4 ? '我的核心目標' : '留給 AI';
+  ta.value = state.cells[i] ? state.cells[i].text : '';
+  ta.addEventListener('input', () =&gt; {
+    setCell(state, Number(ta.dataset.idx), ta.value);   // 即打即存
+  });
+
+  cell.appendChild(ta);
+  grid.appendChild(cell);
+}
+</code></pre>
+<p><code>dataset.idx</code> 是這章的關鍵小技巧:每個 textarea 自己「記得」自己是第幾格,事件發生時用它寫回陣列的正確位置。不要用 DOM 順序去猜對應關係 —— 之後版面一改(插了標籤、換了排序),用順序猜的程式碼就全錯位,而 <code>dataset.idx</code> 不動如山。</p>
+<p>注意 placeholder 的文案:「留給 AI」。空格在這個產品裡不是未完成,是一種合法狀態 —— UI 文案跟資料模型講同一種語言。</p>
+<h3>5. 驗收</h3>
+<ul>
+<li>填三格(含中央),重新整理 → 內容都在。</li>
+<li>把某一格的字全部刪掉,重新整理 → 該格回到 placeholder「留給 AI」。</li>
+<li>F12 → Application → Local Storage → 找到 <code>goal-grid-state-v1</code>,值是一串 JSON,手填的格子 <code>source</code> 是 <code>"user"</code>。</li>
+<li>視窗縮到手機寬度,3×3 沒有破版、沒有橫向捲軸。</li>
+</ul>
+<h2>給 AI 的 prompt 範本</h2>
+<pre><code class="language-text">做一個單檔 HTML 的「目標九宮格」填寫頁(所有 CSS/JS 內嵌在同一個檔案):
+
+【版面】3×3 九宮格,用 CSS Grid(repeat(3,1fr)、gap 10px);每格一個 textarea;
+中央格是「核心目標」,邊框用金色強調;其餘八格是子目標
+【資料模型】一個長度 9 的陣列 cells,index 4 = 核心目標;每格的值:
+null 代表「留給 AI」,有字則存 {text, source:'user'}(之後 AI 填的會用 source:'ai',
+所以結構要先留好)
+【儲存】每次輸入即存 localStorage(key 'goal-grid-state-v1',JSON 格式、含 version:1);
+頁面載入時讀回;JSON 解析失敗或版本不對,就用全新空白狀態,不准報錯
+【對位】每個 textarea 用 dataset.idx 記住自己是第幾格,事件裡用它寫回陣列;
+清空格子時要把該格寫回 null(trim 後為空就算清空),不是存空字串
+【風格】深夜藍底 #0e1420、金色 #c9a44e 點綴,繁體中文,手機優先;
+空格的 placeholder 文字是「留給 AI」,中央格是「我的核心目標」
+【驗收】1. 填三格 → 重新整理 → 內容都在
+2. 把一格字刪光 → 重新整理 → 該格回到 placeholder
+3. 開發者工具看 localStorage,手填格子的 source 是 &quot;user&quot;
+4. 視窗縮到 375px 寬不破版
+</code></pre>
+<h2>常見坑</h2>
+<ol>
+<li><strong>dataset 永遠是字串</strong>:<code>ta.dataset.idx</code> 拿到的是 <code>"4"</code> 不是 <code>4</code>。當索引用要先 <code>Number()</code>,直接拿去 <code>=== 4</code> 比較會永遠 false。</li>
+<li><strong>把字串直接存進陣列</strong>:<code>cells[i] = "減重五公斤"</code> 看起來能動,但丟掉了 <code>source</code> —— 下一章 AI 補格就分不出哪些是使用者手填的,「一字不改」的承諾沒辦法落實。包成 <code>{text, source}</code> 是在替未來的功能留接口。</li>
+<li><strong>JSON.parse 沒包 try/catch</strong>:localStorage 裡可能躺著舊版格式或壞掉的字串,一 parse 就丟例外、整頁 JS 停擺。讀回來的資料永遠當「來路不明」處理(完整版 <code>app/js/state.js</code> 的 <code>normalizeState</code> 甚至逐格重新驗證)。</li>
+<li><strong>清空格子沒有歸 null</strong>:沒做 trim、直接存 <code>{text:""}</code> 或一串空白,AI 會以為這格已被使用者佔用而跳過它。<code>setCell</code> 裡「trim 後為空就寫回 null」那行,就是在防這個。</li>
+<li><strong>用 innerHTML 塞使用者輸入</strong>:重繪畫面時用 <code>innerHTML</code> 把使用者文字拼進 HTML,等於讓任何輸入(包括之後 AI 的輸出)注入任意標籤。一律用 <code>textarea.value</code> 或 <code>textContent</code>。</li>
+<li><strong>忘了中央格的特殊性</strong>:index 4 是核心目標,跑「八個子目標」的迴圈時要跳過它。完整版 <code>app/js/grid.js</code> 用 <code>subIndexOf(pos)</code> 做這個換算(0–3 不變、5–8 減一),之後的配色與 81 格展開都靠它。</li>
+</ol>
+<h2>對照成品</h2>
+<ul>
+<li><code>demos/01-grid-ui/index.html</code> —— 本章成品,單檔、雙擊能開;照步驟做完(或叫 AI 重現)後,你手上應該就是這個東西。</li>
+<li>完整版的同一套邏輯在 <code>app/js/state.js</code>(資料模型 + localStorage,外加 IndexedDB helpers)與 <code>app/js/grid.js</code>(3×3 之外還有 9×9 檢視、AI 徽章格)—— 讀起來會發現骨架跟本章一模一樣,只是格子變多了。</li>
+<li>線上版: https://yazelin.github.io/ai-goal-grid-course/app/ 的步驟二,就是這章的 UI 加上完整視覺。</li>
+</ul>
+</article>
+<nav class="pager"><a href="01-naming-ip.html">← 第 1 章 — 產品定位與命名</a><a href="03-ai-fill.html">第 3 章 — AI 補格 →</a></nav>
+</body>
+</html>

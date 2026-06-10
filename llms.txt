@@ -13,7 +13,8 @@
   3×3 填寫 + AI 補格 + 展開 81 格 + AI 桌布背景 + canvas 文字合成 +
   email 留資。無金鑰時可離線體驗(預設漸層背景)。
 
-## 課程章節(course/)
+## 課程章節(course/,線上閱讀 https://yazelin.github.io/ai-goal-grid-course/course/ ,
+講義 PDF https://yazelin.github.io/ai-goal-grid-course/handout.pdf )
 
 - 00 總覽與前課銜接
 - 00c 金鑰申請指南(OpenAI / Groq key 申請、ChatGPT 介面手動生圖)

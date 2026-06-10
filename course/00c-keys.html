@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>附錄 — 金鑰申請與自備額度指南 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<style>
+:root{--ink:#0e1420;--panel:#141c2b;--gold:#c9a44e;--paper:#f2ede2;
+  --dim:rgba(242,237,226,.66);--line:rgba(201,164,78,.22)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--paper);line-height:1.95;font-size:1.02rem;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  padding:0 20px 72px}
+.top{max-width:760px;margin:0 auto;padding:26px 0 18px;display:flex;
+  justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+.top a{color:var(--gold);text-decoration:none;font-size:.9rem}
+.top .crumb{color:var(--dim);font-size:.82rem;letter-spacing:.18em}
+article{max-width:760px;margin:0 auto;padding-top:10px}
+h1,h2,h3,h4{font-family:"Noto Serif TC","PMingLiU",serif;line-height:1.5;color:var(--paper)}
+article>h1{font-size:1.65rem;margin:28px 0 18px;padding-bottom:12px;
+  border-bottom:2px solid var(--gold)}
+h2{font-size:1.28rem;margin:40px 0 12px;color:var(--gold)}
+h3{font-size:1.08rem;margin:28px 0 10px}
+p,ul,ol{margin:12px 0;color:var(--paper)}
+ul,ol{padding-left:1.6em}
+li{margin:6px 0}
+a{color:var(--gold)}
+blockquote{margin:18px 0;padding:10px 18px;border-left:3px solid var(--gold);
+  background:var(--panel);color:var(--dim);border-radius:0 8px 8px 0}
+pre{background:#0a0f18;border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.7;
+  font-family:"JetBrains Mono","Courier New",monospace;color:#e8e2d4}
+code{font-family:"JetBrains Mono","Courier New",monospace;font-size:.9em;
+  background:var(--panel);padding:1px 6px;border-radius:5px}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--panel);color:var(--gold)}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+.pager{max-width:760px;margin:48px auto 0;display:flex;justify-content:space-between;
+  gap:12px;border-top:1px solid var(--line);padding-top:18px;font-size:.94rem}
+.pager a{text-decoration:none}
+.pager .ph{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="crumb">COURSE</span>
+  <span><a href="index.html">章節目錄</a> · <a href="../">課程首頁</a> · <a href="../app/">成品 App</a></span>
+</div>
+<article>
+<h1>金鑰申請與自備額度 — 兩把鑰匙,和一條不用鑰匙的路</h1>
+<blockquote>
+<p>本課的 AI 功能用到兩種金鑰:Groq(文字補格,免費)與 OpenAI(桌布背景,計量付費)。這一頁一次講清楚:去哪申請、申請完貼到哪裡、各要花多少錢——以及完全不想申請 API 的人,怎麼用手上現成的 ChatGPT 訂閱走完全程。不用一開始就全辦齊:第 03 章才用到 Groq、第 05 章才碰生圖,到時候再回來查也行。</p>
+</blockquote>
+<h2>1. Groq API key(文字補格用,免費)</h2>
+<p>它負責什麼:第 03 章的「AI 補滿空格」與第 10 章的 9×9 展開——Worker 的 <code>/fill</code> 端點拿這把 key 呼叫 Groq 上的 LLM。</p>
+<p>申請步驟(不用綁卡):</p>
+<ol>
+<li>開 https://console.groq.com/ ,用 Google 或 GitHub 帳號註冊登入。</li>
+<li>左側選單點 <strong>API Keys</strong> → <strong>Create API Key</strong>,取個名字(例如 <code>goal-grid</code>)。</li>
+<li>建立後立刻複製——key 只在這一刻完整顯示一次,長相是 <code>gsk_</code> 開頭的一長串。</li>
+</ol>
+<p>免費額度:Groq 免費方案不收錢、不用信用卡,限制的是「請求頻率」(每分鐘/每日的次數上限,依模型而異)。本課的用量——補格一次只是一個請求——個人練習與小流量示範站綽綽有餘;真撞到上限,等幾分鐘就恢復。</p>
+<p>申請完貼到哪裡?看你的角色:</p>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>貼到哪</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>站長(自部署 Worker)</td>
+<td>在 <code>worker-deploy/</code> 目錄執行 <code>npx wrangler secret put GROQ_API_KEY</code>,把 key 貼進去</td>
+<td>key 藏在 Worker Secret,訪客用你的額度,key 永不露出</td>
+</tr>
+<tr>
+<td>學員自己玩</td>
+<td>app 頁尾「進階設定:自帶金鑰(BYO)」的 <strong>Groq API Key</strong> 欄位</td>
+<td>只存你瀏覽器的 localStorage,補格改為前端直連 Groq、走你自己的額度</td>
+</tr>
+</tbody>
+</table>
+<p>兩條路的差別第 03 章講過:BYO 直連只能自己玩(key 在前端,按 F12 看得到),要給別人用,key 必須進 Worker Secret——這是底線,不是建議。</p>
+<h2>2. OpenAI API key(AI 桌布背景用,計量付費)</h2>
+<p>它負責什麼:第 05-07 章的 AI 桌布背景。Worker 的 <code>/image</code> 端點主路走 OpenAI Images API(<code>gpt-image-1</code>),需要這把 key。</p>
+<p>先講清楚一件最常被搞混的事:<strong>API 跟 ChatGPT Plus 訂閱是兩回事</strong>。Plus 的月費買的是「聊天介面的使用權」;API 是另一個錢包,按實際用量計費——就算你訂了 Plus,API 餘額仍然是零,要另外綁卡或儲值。反過來也成立:只用 API 不需要訂 Plus。</p>
+<p>申請步驟:</p>
+<ol>
+<li>開 https://platform.openai.com/ 註冊(跟 chatgpt.com 是同一個帳號,但這裡是開發者後台)。</li>
+<li><strong>Settings → Billing</strong>:綁信用卡或先儲值一小筆(例如 5 美元)。沒做這步,key 建得出來也不能用。</li>
+<li><strong>API keys</strong> → <strong>Create new secret key</strong>,複製 <code>sk-</code> 開頭的 key——同樣只完整顯示一次。</li>
+</ol>
+<p>要花多少錢:<code>gpt-image-1</code> 按生成量計費,一張 medium 品質的直式桌布(1024x1536)約 <strong>0.06-0.07 美元</strong>;本課 Worker 預設每 IP 每日 3 張,小流量示範站通常是每月幾美元的等級。品質檔位由 Worker 環境變數 <code>OPENAI_IMAGE_QUALITY</code> 控制(預設 medium,low 較省、high 較貴)。即便金額不大,仍強烈建議到 <strong>Billing → Limits</strong> 設用量上限(例如每月 10 美元),超過自動停——這是所有「綁了卡的服務」的基本安全帶。</p>
+<p>貼到哪裡:只有一個地方——</p>
+<pre><code class="language-bash">cd worker-deploy
+npx wrangler secret put OPENAI_API_KEY
+</code></pre>
+<p>注意:頁尾的 BYO 進階設定<strong>沒有</strong> OpenAI key 的欄位,這是刻意的——<code>sk-</code> key 連著你的信用卡,不該出現在任何網頁欄位裡。學員想用自己的 OpenAI 額度生圖,正路是照課程自部署一套 Worker(key 放進自己的 Secret),再到進階設定把「Worker 網址」指向它。</p>
+<h2>3. 不想申請 API?用 ChatGPT 介面手動生圖</h2>
+<p>完全不申請任何 key,也能拿到 AI 桌布——這就是第 07 章教的「prompt 是可攜帶的資產」降級路線,在 app 的步驟四就能走:</p>
+<ol>
+<li>展開「<strong>服務忙線或想自己生?</strong>」面板,點「<strong>複製生圖 prompt</strong>」——app 把組好的完整 prompt(風格詞、構圖約束、長寬比提示都在裡面)放進剪貼簿。</li>
+<li>貼到 https://chatgpt.com (或 Gemini)送出,等它生成。</li>
+<li>有上傳參考圖的話,記得自己把圖一併附給 ChatGPT——這條路不經過任何後端,參考圖本來就在你手上。</li>
+<li>生成後下載圖片,回到 app 點「<strong>匯入背景圖</strong>」放回來,後面的文字合成、下載 PNG 完全相同。</li>
+</ol>
+<p>成本:用你現有的 ChatGPT 訂閱額度(免費帳號也能生圖,次數較少)。免 API key、免綁卡、站方後端全掛也走得通——對「只想拿到自己那張桌布」的使用者,這條常常反而是最快的路。</p>
+<h2>4. 三層架構一覽</h2>
+<p>Worker 的 <code>/image</code> 端點按這個順序決定走哪條路:有 <code>OPENAI_API_KEY</code> 就走 OpenAI;沒設但有 <code>CODEX_IMAGE_KEY</code> 就走自架的 codex-image-service;兩把都沒有,回 503 <code>not_configured</code>,前端把「複製 prompt 自己生」列為主要出路。</p>
+<table>
+<thead>
+<tr>
+<th>層</th>
+<th>走哪裡</th>
+<th>誰適合</th>
+<th>成本</th>
+<th>穩定度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主路</td>
+<td>OpenAI Images API(gpt-image-1,同步 90 秒)</td>
+<td>要正式給訪客用的站長</td>
+<td>約 0.06-0.07 美元/張(medium 直式),計量付費</td>
+<td>高:官方雲端服務</td>
+</tr>
+<tr>
+<td>備援</td>
+<td>自架 codex-image-service( https://github.com/yazelin/codex-image-service )</td>
+<td>玩家級自架:家裡有機器、想燒 ChatGPT 訂閱額度而不是 API 帳單的人</td>
+<td>沒有 API 帳單(走 ChatGPT 訂閱額度),但機器要自己養</td>
+<td>中:homelab 等級,斷電斷網就停</td>
+</tr>
+<tr>
+<td>降級</td>
+<td>prompt 外帶(複製 → ChatGPT/Gemini 手動生 → 匯回)</td>
+<td>任何人,包括一把 key 都沒有的訪客</td>
+<td>用使用者自己現有的訂閱</td>
+<td>不依賴本站任何後端,永遠走得通(代價是手動)</td>
+</tr>
+</tbody>
+</table>
+<p>設計觀:三層不是疊床架屋,而是讓每一種「壞掉」都有出路——站長還沒填 key、自架服務睡著了、今天額度用完了,訪客都不會被一句「請稍後再試」送客。三層在程式裡的長相,分別在第 05 章(主路與備援的呼叫)、第 07 章(prompt 外帶)、第 08 章(額度與錯誤文案)。</p>
+<h2>常見坑</h2>
+<ol>
+<li><strong>key 貼錯地方</strong>:<code>gsk_</code>(Groq)兩個地方都能貼——站長進 Worker Secret、自己玩貼頁尾 BYO;<code>sk-</code>(OpenAI)只能進 Worker Secret,前端進階設定刻意沒有它的欄位。分辨法只要記一句:<strong>會連到信用卡的 key,永遠不進瀏覽器</strong>。</li>
+<li><strong>OpenAI 沒綁卡就呼叫</strong>:免費註冊的帳號沒有 API 額度,key 建得出來,一呼叫就是 429(insufficient_quota)。先到 Billing 綁卡或儲值,再測一次。</li>
+<li><strong>key 外洩了</strong>:截圖貼社群、commit 進 git、貼進聊天記錄,都算外洩。處理只有一招:立刻回對應後台 revoke(刪除)那把 key、重發一把新的,Worker 端 <code>wrangler secret put</code> 重新貼一次。兩家的 key 都可以無痛重發,猶豫才是最貴的。</li>
+<li><strong><code>secret put</code> 吃進多餘字元</strong>:複製貼上時 key 尾端多帶一個換行或空白,Worker 就拿著「錯的 key」去呼叫、得到 401。這是本專案部署時真實踩過的雷——貼完多看一眼,懷疑時直接重 put 一次最快。</li>
+</ol>
+</article>
+<nav class="pager"><a href="00b-recap.html">← 第 0 章 — 前課銜接</a><a href="01-naming-ip.html">第 1 章 — 產品定位與命名 →</a></nav>
+</body>
+</html>

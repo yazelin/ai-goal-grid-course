@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 0 章 — 前課銜接 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<style>
+:root{--ink:#0e1420;--panel:#141c2b;--gold:#c9a44e;--paper:#f2ede2;
+  --dim:rgba(242,237,226,.66);--line:rgba(201,164,78,.22)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--paper);line-height:1.95;font-size:1.02rem;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  padding:0 20px 72px}
+.top{max-width:760px;margin:0 auto;padding:26px 0 18px;display:flex;
+  justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+.top a{color:var(--gold);text-decoration:none;font-size:.9rem}
+.top .crumb{color:var(--dim);font-size:.82rem;letter-spacing:.18em}
+article{max-width:760px;margin:0 auto;padding-top:10px}
+h1,h2,h3,h4{font-family:"Noto Serif TC","PMingLiU",serif;line-height:1.5;color:var(--paper)}
+article>h1{font-size:1.65rem;margin:28px 0 18px;padding-bottom:12px;
+  border-bottom:2px solid var(--gold)}
+h2{font-size:1.28rem;margin:40px 0 12px;color:var(--gold)}
+h3{font-size:1.08rem;margin:28px 0 10px}
+p,ul,ol{margin:12px 0;color:var(--paper)}
+ul,ol{padding-left:1.6em}
+li{margin:6px 0}
+a{color:var(--gold)}
+blockquote{margin:18px 0;padding:10px 18px;border-left:3px solid var(--gold);
+  background:var(--panel);color:var(--dim);border-radius:0 8px 8px 0}
+pre{background:#0a0f18;border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.7;
+  font-family:"JetBrains Mono","Courier New",monospace;color:#e8e2d4}
+code{font-family:"JetBrains Mono","Courier New",monospace;font-size:.9em;
+  background:var(--panel);padding:1px 6px;border-radius:5px}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--panel);color:var(--gold)}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+.pager{max-width:760px;margin:48px auto 0;display:flex;justify-content:space-between;
+  gap:12px;border-top:1px solid var(--line);padding-top:18px;font-size:.94rem}
+.pager a{text-decoration:none}
+.pager .ph{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="crumb">COURSE</span>
+  <span><a href="index.html">章節目錄</a> · <a href="../">課程首頁</a> · <a href="../app/">成品 App</a></span>
+</div>
+<article>
+<h1>前課銜接 — 四個會一直用到的零件</h1>
+<blockquote>
+<p>本課假設你上過「AI 互動行銷頁實作課」( https://yazelin.github.io/ai-marketing-pages-course/ )。這頁用半頁複習四個會一直用到的核心,每段附前課傳送門;四段都覺得「嗯,我知道」,就直接開工。</p>
+</blockquote>
+<h2>1. GitHub Pages:把資料夾變成網址</h2>
+<p>repo 裡放 <code>index.html</code> → Settings → Pages → Branch 選 <code>main</code>、<code>/ (root)</code> → 一兩分鐘後拿到 <code>https://你的帳號.github.io/repo名/</code> 。改版 = 重新 commit,稍等就生效。本課的成品 app 與所有 demo 都是這樣上線的。</p>
+<p>複習:前課模組 5「上線:部署決策樹 + GitHub Pages」
+https://yazelin.github.io/ai-marketing-pages-course/course/05-deployment.md</p>
+<h2>2. Cloudflare Worker:幫頁面藏 key 的免費代理</h2>
+<p>API key 等於信用卡,放進網頁任何人按 F12 都看得到。解法是中間加一個 Worker:網頁呼叫 Worker、Worker 拿著藏在 Secret 裡的 key 呼叫 AI、把答案傳回來。</p>
+<pre><code class="language-text">訪客瀏覽器 ──&gt; Cloudflare Worker(key 藏在 Secret)──&gt; AI API
+ GitHub Pages          免費 10 萬次/天
+</code></pre>
+<p>前課一個 Worker 做一件事;本課升級成「一個 Worker 三個職責」:<code>/fill</code> AI 補格、<code>/image</code> 生圖代理、<code>/signup</code> 收名單,從第 03 章起逐章蓋出來。</p>
+<p>複習:前課模組 6「頁面即時呼叫 AI」
+https://yazelin.github.io/ai-marketing-pages-course/course/06-live-ai-on-page.md</p>
+<h2>3. AI prompt 範本的用法</h2>
+<p>本課每章都有「給 AI 的 prompt 範本」,用法跟前課完全一樣:用【】分節把 brief 寫清楚(要什麼、資料長怎樣、風格、驗收標準)→ 整段貼給 ChatGPT / Claude → 存檔開啟、逐項驗收 → 修改靠對話下指令,一次只改一兩件事。你是總監,AI 是工讀生,驗收清單就是你的武器。</p>
+<p>複習:前課模組 1「第一個活動頁」與模組 8「Prompt 兵法」
+https://yazelin.github.io/ai-marketing-pages-course/course/01-first-landing-page.md
+https://yazelin.github.io/ai-marketing-pages-course/course/08-prompt-playbook.md</p>
+<h2>4. demo 09 的 email 收集模式</h2>
+<p>前課最後做過一條名單收集線:報名頁 POST email → Worker 驗證(email 格式、honeypot 隱形欄位、每 IP 限流)→ 寫進 D1 資料庫(UNIQUE 去重)→ admin 後台用 Authorization 標頭帶 token 看名單、匯出 CSV。本課第 09 章直接沿用這個模式,再加上 Turnstile 與「留 email 當場拿模板」的誘因設計。</p>
+<p>複習:前課模組 9「收 email 名單」
+https://yazelin.github.io/ai-marketing-pages-course/course/09-email-list.md</p>
+<h2>30 秒自我檢查</h2>
+<ul>
+<li>我能在十分鐘內把一個資料夾變成公開網址(不行 → 模組 5)</li>
+<li>我說得出「為什麼 API key 不能放進網頁」(說不出 → 模組 6)</li>
+<li>我貼過至少一次【】分節的 prompt,並照清單驗收過成品(沒有 → 模組 1、8)</li>
+<li>我知道 honeypot 跟 admin token 各在防什麼(不知道 → 模組 9)</li>
+</ul>
+<p>四項都打勾,就從第 01 章開始 —— 那章不寫程式,講一個行銷人必修的真實命名故事。</p>
+</article>
+<nav class="pager"><a href="00-overview.html">← 課程總覽</a><a href="00c-keys.html">附錄 — 金鑰申請與自備額度指南 →</a></nav>
+</body>
+</html>
