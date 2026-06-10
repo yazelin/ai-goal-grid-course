@@ -780,3 +780,24 @@ goToStep(1);
     stopGenUi();
   }
 })();
+
+// ---- 站方示範額度顯示(步驟三/四)----
+async function refreshQuotaLines() {
+  const els = [document.getElementById('quota-line-3'), document.getElementById('quota-line-4')]
+    .filter(Boolean);
+  if (!els.length) return;
+  try {
+    const q = await api.getQuota();
+    const line = api.formatQuotaLine(q, api.getByo());
+    for (const el of els) { el.textContent = line; el.hidden = false; }
+  } catch {
+    for (const el of els) el.hidden = true; // 離線/自部署無 /quota 時安靜略過
+  }
+}
+refreshQuotaLines();
+document.querySelectorAll('[data-next], [data-back], [data-go]')
+  .forEach((b) => b.addEventListener('click', () => { setTimeout(refreshQuotaLines, 400); }));
+for (const id of ['ai-fill', 'ai-expand', 'bg-generate']) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', () => { setTimeout(refreshQuotaLines, 3000); });
+}

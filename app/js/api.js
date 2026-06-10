@@ -273,6 +273,28 @@ export function describeError(err, ctx = {}) {
 
 const defaultFetch = (...args) => globalThis.fetch(...args);
 
+// ---- 額度查詢與顯示 ----
+
+// GET /quota:站方示範額度(per IP 當日已用量)
+export async function getQuota(deps = {}) {
+  const d = normDeps(deps);
+  const { res, body } = await fetchJson(d.fetchFn, `${workerBase(d.storage)}/quota`, {});
+  if (!res.ok) throw new ApiError(res.status, body || {});
+  return body;
+}
+
+// 額度顯示文字;byo 有對應金鑰的功能改標示走自帶額度
+export function formatQuotaLine(q, byo = null) {
+  const left = (o) => Math.max(0, o.limit - o.used);
+  const fillPart = byo && byo.groqKey
+    ? '文字走你的自帶金鑰'
+    : `文字(補格/展開)還剩 ${left(q.fill)} / ${q.fill.limit} 次`;
+  const imgPart = byo && byo.codexKey
+    ? '生圖走你的自帶金鑰'
+    : `生圖還剩 ${left(q.img)} / ${q.img.limit} 張`;
+  return `今日示範額度:${fillPart} · ${imgPart}(台北每日 00:00 重置)`;
+}
+
 async function fetchJson(fetchFn, url, init) {
   let res;
   try {
