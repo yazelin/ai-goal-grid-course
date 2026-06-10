@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 互動行銷頁實戰 — 目標九宮格:用 AI 做一頁完整的行銷漏斗</title>
+<meta name="description" content="進階 AI 行銷實作課:做一個讓訪客用 AI 填好目標九宮格、生成專屬桌布、自然留下 email 的互動行銷頁 — 一頁完整的 AI 行銷漏斗。從九宮格 UI、AI 補格、AI 桌布生成、防刷額度到名單後台,含 12 章課程、各章簡報與五個階段 demo,成品可直接體驗。">
+<link rel="canonical" href="https://yazelin.github.io/ai-goal-grid-course/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230e1420'/%3E%3Cg fill='%23586a8a'%3E%3Crect x='2.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='6.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='2.5' y='6.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='6.5' width='3' height='3' rx='.8'/%3E%3Crect x='2.5' y='10.5' width='3' height='3' rx='.8'/%3E%3Crect x='6.5' y='10.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='10.5' width='3' height='3' rx='.8'/%3E%3C/g%3E%3Crect x='6.5' y='6.5' width='3' height='3' rx='.8' fill='%23c9a44e'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AI 互動行銷頁實戰 — 目標九宮格">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:url" content="https://yazelin.github.io/ai-goal-grid-course/">
+<meta property="og:title" content="AI 互動行銷頁實戰 — 目標九宮格">
+<meta property="og:description" content="訪客用 AI 填九宮格、生成專屬桌布、自然留下 email — 做出一頁完整的 AI 行銷漏斗。含 12 章課程、簡報、五個階段 demo 與可直接玩的成品。">
+<meta property="og:image" content="https://yazelin.github.io/ai-goal-grid-course/assets/og-course.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI 互動行銷頁實戰 — 目標九宮格">
+<meta name="twitter:description" content="訪客用 AI 填九宮格、生成專屬桌布、自然留下 email — 一頁完整的 AI 行銷漏斗。">
+<meta name="twitter:image" content="https://yazelin.github.io/ai-goal-grid-course/assets/og-course.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "AI 互動行銷頁實戰 — 目標九宮格",
+  "description": "進階 AI 行銷實作課:做一個讓訪客用 AI 填好目標九宮格、生成專屬桌布、自然留下 email 的互動行銷頁。涵蓋九宮格 UI、AI 補格、AI 桌布生成與編輯迴圈、防刷額度、email 名單收集與後台、發佈與 SEO。",
+  "inLanguage": "zh-Hant",
+  "url": "https://yazelin.github.io/ai-goal-grid-course/",
+  "courseMode": "online",
+  "isAccessibleForFree": true,
+  "provider": { "@type": "Person", "name": "林亞澤 yazelin", "url": "https://yazelin.github.io/" },
+  "coursePrerequisites": {
+    "@type": "Course",
+    "name": "AI 互動行銷頁實戰 — 目標九宮格",
+    "url": "https://yazelin.github.io/ai-marketing-pages-course/"
+  },
+  "about": ["AI 行銷漏斗", "目標九宮格", "AI 圖像生成", "Cloudflare Workers", "GitHub Pages", "email 名單收集"]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 夜空製圖室:#0e1420 星圖底 + #c9a44e 金髮絲線 */
+  :root{
+    --bg:#0e1420; --bg-deep:#0a0f18;
+    --panel:rgba(20,28,44,.55); --panel-2:rgba(13,18,29,.72);
+    --line-gold:rgba(201,164,78,.28); --line-gold-soft:rgba(201,164,78,.14);
+    --line-cool:rgba(140,156,184,.16);
+    --gold:#c9a44e; --gold-bright:#e7c87e; --gold-deep:#8a6c2c;
+    --ink:#e9e6da; --ink-dim:#aab3c5; --muted:#76819a;
+    --serif:"Noto Serif TC","Noto Serif CJK TC","PMingLiU",serif;
+    --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Heiti TC",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{background:var(--bg)}
+  body{
+    font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink);
+    background:
+      radial-gradient(1100px 700px at 72% -8%, rgba(56,80,130,.32), transparent 62%),
+      radial-gradient(900px 600px at 8% 108%, rgba(201,164,78,.07), transparent 60%),
+      var(--bg);
+    min-height:100svh; padding:10vh 6vw 9vh;
+  }
+  /* 星空細點 */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      radial-gradient(1px 1px at 31px 47px, rgba(233,230,218,.40) 50%, transparent 51%),
+      radial-gradient(1px 1px at 173px 113px, rgba(233,230,218,.22) 50%, transparent 51%),
+      radial-gradient(1.4px 1.4px at 97px 191px, rgba(201,164,78,.30) 50%, transparent 51%),
+      radial-gradient(1px 1px at 229px 23px, rgba(233,230,218,.28) 50%, transparent 51%),
+      radial-gradient(1px 1px at 137px 211px, rgba(170,179,197,.22) 50%, transparent 51%);
+    background-size:260px 230px; opacity:.5;
+  }
+  /* 低調的九宮格製圖線:整個視窗劃為 3×3 */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(201,164,78,.05) 0 1px, transparent 1px 33.34vh),
+      repeating-linear-gradient(90deg, rgba(201,164,78,.05) 0 1px, transparent 1px 33.34vw);
+    -webkit-mask-image:radial-gradient(120% 120% at 50% 30%, #000 35%, transparent 85%);
+    mask-image:radial-gradient(120% 120% at 50% 30%, #000 35%, transparent 85%);
+  }
+  main{position:relative; z-index:1; max-width:1080px; margin:0 auto}
+
+  .kicker-row{display:flex; align-items:center; gap:14px; margin-bottom:1.5rem}
+  .brand-mark{width:30px; height:30px; flex:none}
+  .kicker{font-size:.76rem; letter-spacing:.4em; color:var(--gold)}
+  h1{
+    font-family:var(--serif); font-weight:700;
+    font-size:clamp(1.95rem,5.4vw,3.6rem); line-height:1.34; letter-spacing:.04em;
+    margin-bottom:1.3rem; max-width:19em;
+  }
+  h1 em{
+    font-style:normal;
+    background:linear-gradient(120deg, var(--gold-bright), var(--gold) 55%, #a9853a);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .sub{color:var(--ink-dim); line-height:2; margin-bottom:1.2rem; max-width:37em}
+  .sub strong{color:var(--ink); font-weight:500}
+  .funnel{
+    display:flex; flex-wrap:wrap; align-items:center; gap:.45em 0;
+    font-family:var(--serif); font-size:.92rem; letter-spacing:.06em;
+    color:var(--gold-bright); margin-bottom:4.2rem;
+  }
+  .funnel span{white-space:nowrap}
+  .funnel i{
+    font-style:normal; color:var(--muted); margin:0 .9em;
+    font-family:var(--sans); font-size:.8rem;
+  }
+
+  .grid{display:grid; gap:1.4rem; grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  a.card{
+    display:block; text-decoration:none; color:var(--ink);
+    border:1px solid var(--line-cool); border-radius:6px;
+    padding:2.1rem 1.8rem 1.9rem; position:relative; overflow:hidden;
+    background:linear-gradient(165deg, var(--panel), var(--panel-2));
+    transition:transform .35s cubic-bezier(.2,.8,.2,1), border-color .35s, box-shadow .35s;
+  }
+  a.card::before{
+    content:""; position:absolute; inset:0 auto auto 0; width:100%; height:2px;
+    background:linear-gradient(90deg, transparent, var(--line-gold), transparent);
+    opacity:0; transition:opacity .35s;
+  }
+  a.card:hover, a.card:focus-visible{
+    transform:translateY(-5px); border-color:var(--line-gold);
+    box-shadow:0 14px 34px rgba(8,10,16,.5), 0 0 0 1px rgba(201,164,78,.06);
+  }
+  a.card:hover::before, a.card:focus-visible::before{opacity:1}
+  .num{font-family:var(--serif); font-size:.74rem; color:var(--gold); letter-spacing:.3em; margin-bottom:1rem}
+  .card h2{font-family:var(--serif); font-weight:700; font-size:1.25rem; letter-spacing:.05em; margin-bottom:.7rem}
+  .card p.desc{color:var(--ink-dim); font-size:.88rem; line-height:1.9}
+
+  .orna{display:flex; align-items:center; gap:12px; margin:4.2rem 0 2.6rem}
+  .orna i{flex:1; height:1px; background:linear-gradient(90deg, transparent, var(--line-gold), transparent)}
+  .orna b{
+    width:7px; height:7px; flex:none; transform:rotate(45deg);
+    border:1px solid var(--gold-deep); background:rgba(201,164,78,.25);
+  }
+
+  .prereq{
+    border:1px solid var(--line-gold-soft); border-radius:6px;
+    background:linear-gradient(165deg, rgba(20,28,44,.4), rgba(13,18,29,.6));
+    padding:1.9rem 1.8rem;
+    display:flex; flex-wrap:wrap; align-items:center; gap:1.2rem 2.4rem;
+  }
+  .prereq .txt{flex:1 1 24em; min-width:0}
+  .prereq h2{font-family:var(--serif); font-weight:700; font-size:1.2rem; letter-spacing:.05em; margin-bottom:.5rem}
+  .prereq p{color:var(--ink-dim); font-size:.9rem; line-height:1.95}
+  a.ghost-btn{
+    flex:none; display:inline-block; text-decoration:none;
+    font-family:var(--serif); font-size:.92rem; letter-spacing:.12em;
+    color:var(--gold-bright); border:1px solid var(--line-gold); border-radius:4px;
+    padding:.7em 1.5em; transition:border-color .3s, background .3s, color .3s;
+  }
+  a.ghost-btn:hover, a.ghost-btn:focus-visible{
+    border-color:var(--gold); background:rgba(201,164,78,.08); color:var(--gold-bright);
+  }
+
+  footer{
+    margin-top:4.6rem; padding-top:1.8rem;
+    border-top:1px solid var(--line-cool);
+    color:var(--muted); font-size:.78rem; letter-spacing:.06em; line-height:2.2;
+  }
+  footer a{color:var(--gold)}
+  footer .credit{margin-top:.8rem; color:var(--ink-dim)}
+
+  @media (max-width:719px){
+    body{padding:8vh 6vw 8vh}
+    .funnel{margin-bottom:3.2rem}
+    a.card{padding:1.8rem 1.4rem 1.6rem}
+    .prereq{padding:1.6rem 1.4rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *, *::before, *::after{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="kicker-row">
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+        <g fill="none" stroke="rgba(201,164,78,.5)" stroke-width="1.4">
+          <rect x="2" y="2" width="9" height="9" rx="2"/>
+          <rect x="13.5" y="2" width="9" height="9" rx="2"/>
+          <rect x="25" y="2" width="9" height="9" rx="2"/>
+          <rect x="2" y="13.5" width="9" height="9" rx="2"/>
+          <rect x="25" y="13.5" width="9" height="9" rx="2"/>
+          <rect x="2" y="25" width="9" height="9" rx="2"/>
+          <rect x="13.5" y="25" width="9" height="9" rx="2"/>
+          <rect x="25" y="25" width="9" height="9" rx="2"/>
+        </g>
+        <rect x="13.5" y="13.5" width="9" height="9" rx="2" fill="#c9a44e"/>
+      </svg>
+      <p class="kicker">AI GOAL GRID COURSE</p>
+    </div>
+    <h1>AI 互動行銷頁實戰<br>— <em>目標九宮格</em></h1>
+    <p class="sub">前課教零件,本課把零件組成一個真產品:做一個互動行銷頁,讓訪客<strong>用 AI 填好一張目標九宮格</strong>、<strong>生成一張專屬桌布帶走</strong>,並在拿到價值的那一刻<strong>自然留下 email</strong>。從九宮格 UI、AI 補格、AI 桌布生成、防刷額度到名單後台,全程實作。</p>
+    <p class="funnel" aria-label="行銷漏斗流程"><span>免費價值</span><i>→</i><span>AI 互動體驗</span><i>→</i><span>專屬桌布</span><i>→</i><span>email 名單</span><i>=</i><span>一頁完整的 AI 行銷漏斗</span></p>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="app/">
+      <p class="num">APP</p>
+      <h2>成品體驗</h2>
+      <p class="desc">課程主角,直接玩:填九宮格、AI 補完、展開 81 格、生成專屬桌布、留 email 拿 30 天行動追蹤模板。離線也能跑完核心流程。</p>
+    </a>
+    <a class="card" href="https://github.com/yazelin/ai-goal-grid-course/tree/main/course">
+      <p class="num">COURSE</p>
+      <h2>課程</h2>
+      <p class="desc">12 章 markdown 課程,從 00 總覽讀起:商標研究實錄、九宮格資料模型、LLM JSON 補格、長任務生圖、四層防刷到名單後台,GitHub 上直接讀。</p>
+    </a>
+    <a class="card" href="slides/">
+      <p class="num">SLIDES</p>
+      <h2>簡報</h2>
+      <p class="desc">各章 HTML 簡報,瀏覽器直接放映:← → 翻頁,F11 全螢幕,上課與自學都好用。</p>
+    </a>
+    <a class="card" href="demos/01-grid-ui/">
+      <p class="num">DEMOS</p>
+      <h2>階段成品</h2>
+      <p class="desc">01 九宮格 UI、02 AI 補格、03 桌布合成、04 額度防護、05 email 收集 — 五個階段半成品,漸進建造同一個 app,每章結束就是你手上的版本。</p>
+    </a>
+  </div>
+
+  <div class="orna" aria-hidden="true"><i></i><b></b><i></i></div>
+
+  <section class="prereq">
+    <div class="txt">
+      <h2>還沒上過基礎課?</h2>
+      <p>本課假設你已經會用 AI 生頁、GitHub Pages 上線與 Cloudflare Worker 基礎。這些都在前課「AI 互動行銷頁實作課」:十個模組、七個 demo,從零開始,免費。</p>
+    </div>
+    <a class="ghost-btn" href="https://yazelin.github.io/ai-marketing-pages-course/">前往基礎課</a>
+  </section>
+
+  <footer>
+    「目標九宮格」方法源自原田隆史的原田メソッド(Open Window 64);大谷翔平高一時於花卷東高校依此方法填寫目標達成表。<br>
+    「マンダラチャート」は一般社団法人マンダラチャート協会の登録商標です。本專案為教學用免費工具,與上述組織無從屬關係。
+    <p class="credit">課程:<a href="https://yazelin.github.io/">林亞澤 yazelin</a> · 教材與成品原始碼:<a href="https://github.com/yazelin/ai-goal-grid-course">GitHub repo</a></p>
+  </footer>
+</main>
+</body>
+</html>

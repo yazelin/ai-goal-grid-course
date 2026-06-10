@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo 03 — canvas 桌布合成|目標九宮格</title>
+<meta name="description" content="目標九宮格課程 demo 03:漸層背景 + 九宮格文字 canvas 合成,直式/橫式切換與 PNG 下載。對應課程第 05-07 章。">
+<style>
+/* ---- 夜空製圖室主題(與 app/ 同款,單檔內嵌精簡版)---- */
+:root {
+  --bg: #0e1420;
+  --bg-deep: #0a0f18;
+  --panel: rgba(20, 28, 44, 0.55);
+  --panel-2: rgba(13, 18, 29, 0.72);
+  --line-gold: rgba(201, 164, 78, 0.28);
+  --line-gold-soft: rgba(201, 164, 78, 0.14);
+  --line-cool: rgba(140, 156, 184, 0.16);
+  --gold: #c9a44e;
+  --gold-bright: #e7c87e;
+  --gold-deep: #8a6c2c;
+  --ink: #e9e6da;
+  --ink-dim: #aab3c5;
+  --muted: #76819a;
+  --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+  --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 700px at 72% -8%, rgba(56, 80, 130, 0.32), transparent 62%),
+    radial-gradient(900px 600px at 8% 108%, rgba(201, 164, 78, 0.07), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 31px 47px, rgba(233, 230, 218, 0.40) 50%, transparent 51%),
+    radial-gradient(1px 1px at 173px 113px, rgba(233, 230, 218, 0.22) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 97px 191px, rgba(201, 164, 78, 0.30) 50%, transparent 51%),
+    radial-gradient(1px 1px at 229px 23px, rgba(233, 230, 218, 0.28) 50%, transparent 51%);
+  background-size: 260px 230px;
+  opacity: 0.5;
+}
+.wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 26px 20px 60px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 28px; }
+.brand-name { font-family: var(--serif); font-size: 19px; font-weight: 700; letter-spacing: 0.12em; }
+.brand-tag { font-size: 11px; letter-spacing: 0.3em; color: var(--gold); opacity: 0.8; }
+.kicker { font-size: 12px; letter-spacing: 0.32em; color: var(--gold); margin-bottom: 10px; }
+h1 { font-family: var(--serif); font-size: clamp(1.6rem, 5.4vw, 2.4rem); line-height: 1.35; margin-bottom: 12px; }
+.lede { color: var(--ink-dim); max-width: 620px; margin-bottom: 34px; }
+h2 { font-family: var(--serif); font-size: 1.25rem; margin-bottom: 14px; color: var(--gold-bright); }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line-gold-soft);
+  border-radius: 12px;
+  padding: 24px 22px;
+  margin-bottom: 26px;
+  backdrop-filter: blur(4px);
+}
+.hint { font-size: 13px; color: var(--muted); }
+.note-ok { color: var(--gold-bright); font-size: 13px; }
+
+/* 3×3 填寫格 */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+.grid3 textarea {
+  width: 100%; min-height: 86px; resize: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  padding: 10px;
+  transition: border-color 0.2s;
+}
+.grid3 textarea:focus { outline: none; border-color: var(--gold); }
+.grid3 textarea.core {
+  border-color: var(--line-gold);
+  background: rgba(201, 164, 78, 0.10);
+  font-weight: 700;
+}
+.grid3 textarea::placeholder { color: var(--muted); }
+
+/* 控制列 */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
+.btn {
+  font-family: var(--sans); font-size: 13.5px; letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  background: none;
+  border: 1px solid var(--line-gold);
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn:hover { border-color: var(--gold); background: rgba(201, 164, 78, 0.08); }
+.btn-primary { background: var(--gold); color: #141a26; font-weight: 700; border-color: var(--gold); }
+.btn-primary:hover { background: var(--gold-bright); }
+.seg { display: inline-flex; border: 1px solid var(--line-cool); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font-family: var(--sans); font-size: 13px; padding: 8px 14px;
+  background: none; border: 0; color: var(--ink-dim); cursor: pointer;
+}
+.seg button.on { background: rgba(201, 164, 78, 0.16); color: var(--gold-bright); }
+
+/* 風格選擇 */
+.styles { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; }
+.style-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer; color: var(--ink-dim);
+  font-family: var(--sans); font-size: 13.5px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.style-chip.on { border-color: var(--gold); color: var(--gold-bright); }
+.swatch { width: 38px; height: 16px; border-radius: 4px; flex: none; }
+
+/* 預覽 */
+.preview-box { text-align: center; margin-top: 14px; }
+#preview {
+  max-width: 100%; max-height: 72vh; width: auto; height: auto;
+  border: 1px solid var(--line-gold-soft); border-radius: 10px;
+  background: var(--bg-deep);
+}
+
+/* 教學筆記 */
+ol.steps { margin: 8px 0 8px 22px; color: var(--ink-dim); }
+ol.steps li { margin-bottom: 8px; }
+ol.steps b { color: var(--ink); font-weight: 600; }
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88em;
+  background: rgba(201, 164, 78, 0.10);
+  border-radius: 4px; padding: 1px 6px;
+  color: var(--gold-bright);
+}
+.callout {
+  border-left: 3px solid var(--gold);
+  background: rgba(201, 164, 78, 0.06);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 13.5px; color: var(--ink-dim);
+  margin-top: 14px;
+}
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line-cool); font-size: 13px; color: var(--muted); }
+footer a { color: var(--gold); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+@media (max-width: 560px) {
+  .grid3 textarea { min-height: 72px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <span class="brand-name">目標九宮格</span>
+    <span class="brand-tag">DEMO 03</span>
+  </header>
+
+  <p class="kicker">課程第 05-07 章 — 桌布生成</p>
+  <h1>canvas 桌布合成:背景 + 文字疊加</h1>
+  <p class="lede">
+    桌布管線的核心決策:AI 只負責「背景」,中文字由前端 canvas 疊上去
+    —— 因為 AI 生圖畫中文必翻車。這個 demo 把 AI 背景換成可選的漸層背景,
+    專注練 canvas 合成本身;AI 生圖(非同步 job + 輪詢)在完整版 app 裡。
+  </p>
+
+  <section class="panel">
+    <h2>一、填 3×3 九宮格</h2>
+    <p class="hint">中央是核心目標,周圍 8 格是子目標。可手填,或讀回你在 demo 01 / 完整版存的內容(同一把 localStorage 鑰匙 <code>goal-grid-state-v1</code>)。</p>
+    <div class="controls">
+      <button type="button" class="btn" id="loadSaved">讀取已存的九宮格</button>
+      <button type="button" class="btn" id="loadSample">填入範例</button>
+      <span class="hint" id="loadMsg"></span>
+    </div>
+    <div class="grid3" id="grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2>二、選方向與背景,合成桌布</h2>
+    <div class="controls">
+      <span class="hint">方向</span>
+      <span class="seg" id="orientSeg">
+        <button type="button" data-orient="portrait" class="on">直式 1170×2532</button>
+        <button type="button" data-orient="landscape">橫式 1920×1080</button>
+      </span>
+    </div>
+    <div class="controls">
+      <span class="hint">背景漸層</span>
+    </div>
+    <div class="styles" id="styles"></div>
+    <div class="controls" style="margin-top:16px">
+      <button type="button" class="btn-primary btn" id="download">下載 PNG</button>
+      <span class="hint">改任何設定都會即時重繪 —— 文字合成是零成本的,這就是「背景與文字解耦」的好處。</span>
+    </div>
+    <div class="preview-box">
+      <canvas id="preview" aria-label="桌布預覽"></canvas>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>三、這頁在教什麼</h2>
+    <ol class="steps">
+      <li><b>背景鋪滿</b>:這裡用 <code>createLinearGradient</code> 畫漸層;完整版換成 AI 生成的背景圖,用 cover 縮放鋪滿(<code>drawImage</code> 取置中裁切區)。</li>
+      <li><b>全幅遮罩</b>:疊一層 <code>rgba(8,10,16,0.30)</code> 半透明暗化 —— 不管背景多花,字都讀得到。</li>
+      <li><b>畫九宮格</b>:圓角矩形格底 + 中央格主色強調 + 子目標格左色條;每格文字用「二分搜尋字級 + 中文逐字斷行」(<code>fitText</code>)自動塞進格子,長短目標都不爆框。</li>
+      <li><b>匯出</b>:<code>canvas.toBlob('image/png')</code> 轉檔下載 —— 桌布從頭到尾沒離開過你的瀏覽器。</li>
+    </ol>
+    <div class="callout">
+      完整版 app 在這條管線前面多接一段:把目標關鍵詞組成生圖 prompt(明令 AI 不准畫任何文字、中央留低對比區給文字),
+      丟給生圖服務跑 70-180 秒的非同步 job,前端輪詢拿回背景圖 —— 那是第 05、07 章的主題;本頁是第 06 章的合成核心。
+    </div>
+  </section>
+
+  <footer>
+    <p>↑ 完整版:<a href="../../app/">../../app/</a>(AI 背景生成、八種風格、9×9 進階版型)</p>
+    <p>AI 互動行銷頁實戰 — 目標九宮格.方法淵源:原田メソッド(目標達成シート);「マンダラチャート」為他人註冊商標,本課程與其無關。</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+// ============ 資料 ============
+// 三組背景預設(取自完整版 styles-presets.js 的 palette,色值一致)
+const PRESETS = [
+  { id: 'aurora', name: '極光夜空', palette: { accent: '#7ce8d5',
+    sub: ['#5eead4', '#a78bfa', '#76c7ff', '#8be29b', '#c9b8ff', '#67e8f9', '#f0a6e8', '#9fc1ff'] } },
+  { id: 'ink', name: '水墨山色', palette: { accent: '#d8c8a8',
+    sub: ['#e8e2d4', '#aebbc9', '#d8c08e', '#93a8b8', '#c9d2dc', '#b3a284', '#8da4ad', '#ddd2bd'] } },
+  { id: 'neon', name: '霓虹夜城', palette: { accent: '#ff4fd8',
+    sub: ['#22d9ff', '#ff6ec7', '#8f7bff', '#3dffb0', '#ffe14d', '#ff7a8a', '#4dc3ff', '#c95eff'] } },
+];
+const SAMPLE = [
+  '每天寫 500 字', '讀完 12 本書', '固定運動習慣',
+  '每週覆盤一次', '半年內完成個人品牌網站', '存下兩成收入',
+  '睡滿七小時', '每月發表一篇文章', '練好一道拿手菜',
+];
+
+// 本 demo 自己的草稿鑰匙(不覆寫完整版的 goal-grid-state-v1,只讀它)
+const DRAFT_KEY = 'goal-grid-demo03-cells';
+const APP_STATE_KEY = 'goal-grid-state-v1';
+
+// ============ 狀態 ============
+let orientation = 'portrait';
+let styleId = 'aurora';
+let cells = Array(9).fill(''); // 純字串,空字串 = 留白
+
+// ============ 版型常數(契約 C5 的最小版:單一 3×3 版型)============
+const CANVAS = { portrait: { w: 1170, h: 2532 }, landscape: { w: 1920, h: 1080 } };
+const FONT = "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif";
+const CELL_BG = 'rgba(12, 16, 24, 0.58)';
+const MASK = 'rgba(8, 10, 16, 0.30)';
+const FOOTER_TEXT = '目標九宮格 · yazelin.github.io/ai-goal-grid-course';
+
+function hexA(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+// 子目標色索引:cells 索引(跳過中央 4)映到 0-7
+const subIndexOf = (i) => (i < 4 ? i : i - 1);
+
+// ============ 文字工具:中文逐字斷行 + 二分搜尋字級 ============
+function wrapCJK(text, maxWidth, measure) {
+  const lines = [];
+  let line = '';
+  const push = (unit) => {
+    const next = line + unit;
+    if (line && measure(next) > maxWidth) { lines.push(line); line = unit; }
+    else line = next;
+  };
+  // 英數連續段(如 500字 的「500」)視為不可拆單位;其餘逐字
+  const units = String(text).match(/[A-Za-z0-9]+|[\s\S]/gu) || [];
+  for (const unit of units) {
+    if (unit === '\n') { lines.push(line); line = ''; continue; }
+    if (unit.length > 1 && measure(unit) > maxWidth) { for (const ch of unit) push(ch); }
+    else push(unit);
+  }
+  lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+function fitText(ctx, text, { maxWidth, maxHeight, maxFont, weight }) {
+  const lineHeight = 1.32;
+  const tryFit = (fs) => {
+    ctx.font = `${weight} ${fs}px ${FONT}`;
+    const measure = (s) => ctx.measureText(s).width;
+    const lines = wrapCJK(text, maxWidth, measure);
+    const ok = lines.length * fs * lineHeight <= maxHeight && lines.every((l) => measure(l) <= maxWidth + 0.01);
+    return ok ? lines : null;
+  };
+  let lo = 14, hi = Math.max(14, Math.floor(maxFont)), best = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const lines = tryFit(mid);
+    if (lines) { best = { fontSize: mid, lines }; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  if (!best) {
+    ctx.font = `${weight} 14px ${FONT}`;
+    best = { fontSize: 14, lines: wrapCJK(text, maxWidth, (s) => ctx.measureText(s).width) };
+  }
+  return best;
+}
+
+// ============ 繪製 ============
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') { ctx.roundRect(x, y, w, h, r); return; }
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawBackground(ctx, W, H, palette) {
+  ctx.fillStyle = '#0a0f18';
+  ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, hexA(palette.sub[0], 0.5));
+  grad.addColorStop(0.45, hexA(palette.accent, 0.26));
+  grad.addColorStop(1, hexA(palette.sub[4], 0.46));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // 角落柔光,讓漸層不死板
+  const glow = ctx.createRadialGradient(W * 0.85, H * 0.1, 0, W * 0.85, H * 0.1, Math.max(W, H) * 0.7);
+  glow.addColorStop(0, hexA(palette.sub[2], 0.30));
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawCell(ctx, rect, radius, spec) {
+  roundRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+  ctx.fillStyle = spec.fill;
+  ctx.fill();
+  if (spec.border) {
+    ctx.strokeStyle = spec.border;
+    ctx.lineWidth = spec.borderWidth || 1;
+    ctx.stroke();
+  }
+  if (spec.leftBar) {
+    ctx.save();
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+    ctx.clip();
+    ctx.fillStyle = spec.leftBar;
+    ctx.fillRect(rect.x, rect.y, 4, rect.h);
+    ctx.restore();
+  }
+  if (!spec.text) return;
+  const pad = spec.pad;
+  const { fontSize, lines } = fitText(ctx, spec.text, {
+    maxWidth: rect.w - pad * 2, maxHeight: rect.h - pad * 2,
+    maxFont: spec.maxFont, weight: spec.weight,
+  });
+  ctx.save();
+  ctx.font = `${spec.weight} ${fontSize}px ${FONT}`;
+  ctx.fillStyle = spec.color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = fontSize * 0.18;
+  const lh = fontSize * 1.32;
+  let y = rect.y + rect.h / 2 - (lines.length * lh) / 2 + lh / 2;
+  for (const line of lines) {
+    ctx.fillText(line, rect.x + rect.w / 2, y);
+    y += lh;
+  }
+  ctx.restore();
+}
+
+function render() {
+  const canvas = document.getElementById('preview');
+  const { w: W, h: H } = CANVAS[orientation];
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const palette = PRESETS.find((p) => p.id === styleId).palette;
+
+  // 1) 背景 2) 遮罩
+  drawBackground(ctx, W, H, palette);
+  ctx.fillStyle = MASK;
+  ctx.fillRect(0, 0, W, H);
+
+  // 3) 九宮格幾何(契約 C5):格寬 = min(0.86W, 0.52H)/3
+  const cell = Math.min(0.86 * W, 0.52 * H) / 3;
+  const gap = cell * 0.06;
+  const radius = cell * 0.08;
+  const size = 3 * cell + 2 * gap;
+  const cx = 0.5 * W;
+  const cy = orientation === 'portrait' ? 0.44 * H : 0.5 * H;
+  const gx = cx - size / 2;
+  const gy = cy - size / 2;
+
+  for (let i = 0; i < 9; i++) {
+    const rect = {
+      x: gx + (i % 3) * (cell + gap),
+      y: gy + Math.floor(i / 3) * (cell + gap),
+      w: cell, h: cell,
+    };
+    if (i === 4) {
+      drawCell(ctx, rect, radius, {
+        fill: hexA(palette.accent, 0.85), border: palette.accent, borderWidth: 3,
+        text: cells[i], color: '#ffffff', weight: 700,
+        maxFont: cell * 0.18, pad: cell * 0.11,
+      });
+    } else {
+      drawCell(ctx, rect, radius, {
+        fill: CELL_BG, border: 'rgba(233, 230, 218, 0.12)', borderWidth: 1,
+        leftBar: palette.sub[subIndexOf(i)],
+        text: cells[i], color: '#f1eee4', weight: 500,
+        maxFont: cell * 0.15, pad: cell * 0.11,
+      });
+    }
+  }
+
+  // 4) 角落署名
+  const fs = Math.max(20, Math.round(Math.min(W, H) * 0.019));
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = '#e9e6da';
+  ctx.font = `500 ${fs}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(FOOTER_TEXT, W / 2, H - fs * 1.2);
+  ctx.restore();
+}
+
+// ============ UI 接線 ============
+const gridEl = document.getElementById('grid');
+const loadMsg = document.getElementById('loadMsg');
+
+function buildGrid() {
+  const labels = ['子目標 1', '子目標 2', '子目標 3', '子目標 4', '核心目標', '子目標 5', '子目標 6', '子目標 7', '子目標 8'];
+  for (let i = 0; i < 9; i++) {
+    const ta = document.createElement('textarea');
+    ta.dataset.idx = i;
+    ta.placeholder = labels[i];
+    if (i === 4) ta.classList.add('core');
+    ta.addEventListener('input', () => {
+      cells[i] = ta.value.trim();
+      saveDraft();
+      render();
+    });
+    gridEl.appendChild(ta);
+  }
+}
+
+function fillInputs() {
+  gridEl.querySelectorAll('textarea').forEach((ta) => {
+    ta.value = cells[Number(ta.dataset.idx)] || '';
+  });
+}
+
+function saveDraft() {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(cells)); } catch { /* 私密模式等情境,略過 */ }
+}
+
+function loadDraft() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    if (Array.isArray(raw)) {
+      for (let i = 0; i < 9; i++) cells[i] = typeof raw[i] === 'string' ? raw[i] : '';
+      return true;
+    }
+  } catch { /* 壞資料當沒有 */ }
+  return false;
+}
+
+// 讀完整版 / demo 01 的 state:cells = 9 × (null | {text, source})
+function loadAppState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(APP_STATE_KEY));
+    if (!raw || !Array.isArray(raw.cells)) return 0;
+    let n = 0;
+    for (let i = 0; i < 9; i++) {
+      const c = raw.cells[i];
+      const text = c && typeof c === 'object' && typeof c.text === 'string' ? c.text.trim() : '';
+      cells[i] = text;
+      if (text) n++;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+document.getElementById('loadSaved').addEventListener('click', () => {
+  const n = loadAppState();
+  if (n > 0) {
+    fillInputs();
+    saveDraft();
+    render();
+    loadMsg.textContent = `讀到 ${n} 格已填內容。`;
+    loadMsg.className = 'note-ok';
+  } else {
+    loadMsg.textContent = '沒讀到已存的九宮格 —— 先去 demo 01 或完整版填,或直接手填/用範例。';
+    loadMsg.className = 'hint';
+  }
+});
+
+document.getElementById('loadSample').addEventListener('click', () => {
+  cells = SAMPLE.slice();
+  fillInputs();
+  saveDraft();
+  render();
+  loadMsg.textContent = '已填入範例,九格可自由改。';
+  loadMsg.className = 'note-ok';
+});
+
+document.getElementById('orientSeg').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-orient]');
+  if (!btn) return;
+  orientation = btn.dataset.orient;
+  document.querySelectorAll('#orientSeg button').forEach((b) => b.classList.toggle('on', b === btn));
+  render();
+});
+
+const stylesEl = document.getElementById('styles');
+for (const p of PRESETS) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'style-chip' + (p.id === styleId ? ' on' : '');
+  const sw = document.createElement('span');
+  sw.className = 'swatch';
+  sw.style.background = `linear-gradient(90deg, ${p.palette.sub[0]}, ${p.palette.accent}, ${p.palette.sub[4]})`;
+  chip.appendChild(sw);
+  chip.appendChild(document.createTextNode(p.name));
+  chip.addEventListener('click', () => {
+    styleId = p.id;
+    stylesEl.querySelectorAll('.style-chip').forEach((c) => c.classList.toggle('on', c === chip));
+    render();
+  });
+  stylesEl.appendChild(chip);
+}
+
+document.getElementById('download').addEventListener('click', () => {
+  const canvas = document.getElementById('preview');
+  canvas.toBlob((blob) => {
+    if (!blob) { alert('匯出失敗,請換瀏覽器再試'); return; }
+    const d = new Date();
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `目標九宮格-${ymd}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }, 'image/png');
+});
+
+// ============ 啟動 ============
+buildGrid();
+if (!loadDraft()) {
+  // 第一次開:若 demo 01 / 完整版有存過就自動帶入,否則留白
+  loadAppState();
+}
+fillInputs();
+render();
+</script>
+</body>
+</html>

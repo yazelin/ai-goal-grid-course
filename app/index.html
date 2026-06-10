@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>目標九宮格 Goal Grid — 用 AI 把一個目標拆成 81 步</title>
+<meta name="description" content="五分鐘填好一張目標九宮格:中央寫核心目標,AI 補滿 8 個子目標、展開 64 個行動,最後做成一張專屬桌布帶走。方法源自原田メソッド,大谷翔平高中時期的目標達成表即著名案例。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230e1420'/%3E%3Cg fill='%23586a8a'%3E%3Crect x='2.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='6.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='2.5' width='3' height='3' rx='.8'/%3E%3Crect x='2.5' y='6.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='6.5' width='3' height='3' rx='.8'/%3E%3Crect x='2.5' y='10.5' width='3' height='3' rx='.8'/%3E%3Crect x='6.5' y='10.5' width='3' height='3' rx='.8'/%3E%3Crect x='10.5' y='10.5' width='3' height='3' rx='.8'/%3E%3C/g%3E%3Crect x='6.5' y='6.5' width='3' height='3' rx='.8' fill='%23c9a44e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-head wrap">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+      <g fill="none" stroke="rgba(201,164,78,.5)" stroke-width="1.4">
+        <rect x="2" y="2" width="9" height="9" rx="2"/>
+        <rect x="13.5" y="2" width="9" height="9" rx="2"/>
+        <rect x="25" y="2" width="9" height="9" rx="2"/>
+        <rect x="2" y="13.5" width="9" height="9" rx="2"/>
+        <rect x="25" y="13.5" width="9" height="9" rx="2"/>
+        <rect x="2" y="25" width="9" height="9" rx="2"/>
+        <rect x="13.5" y="25" width="9" height="9" rx="2"/>
+        <rect x="25" y="25" width="9" height="9" rx="2"/>
+      </g>
+      <rect x="13.5" y="13.5" width="9" height="9" rx="2" fill="#c9a44e"/>
+    </svg>
+    <span class="brand-name">目標九宮格</span>
+    <span class="brand-en">GOAL GRID</span>
+  </div>
+
+  <nav class="rail" aria-label="步驟進度">
+    <button class="rail-step" type="button" data-go="1"><span class="rail-num">一</span><span class="rail-label">起點</span></button>
+    <button class="rail-step" type="button" data-go="2"><span class="rail-num">二</span><span class="rail-label">填寫</span></button>
+    <button class="rail-step" type="button" data-go="3"><span class="rail-num">三</span><span class="rail-label">AI 補完</span></button>
+    <button class="rail-step" type="button" data-go="4"><span class="rail-num">四</span><span class="rail-label">桌布</span></button>
+    <button class="rail-step" type="button" data-go="5"><span class="rail-num">五</span><span class="rail-label">帶走</span></button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- 步驟一:起點 -->
+  <section data-step="1">
+    <div class="hero stagger">
+      <p class="kicker">五分鐘 · 一張九宮格 · 八十一步</p>
+      <h1>把一個目標,<br>拆成<em>做得到</em>的八十一步</h1>
+      <p class="lede">中央寫下你的核心目標,AI 陪你補滿八個子目標、展開六十四個具體行動,最後合成一張屬於你的目標桌布。</p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" type="button" data-next>開始填我的九宮格</button>
+        <p class="note">免登入。內容只存在你自己的瀏覽器裡。</p>
+      </div>
+    </div>
+
+    <div class="orna" aria-hidden="true"><i class="orna-line"></i><i class="orna-diamond"></i><i class="orna-line"></i></div>
+
+    <div class="card">
+      <p class="sec-kicker">方法</p>
+      <h2>九宮格目標法</h2>
+      <div class="law">
+        <div class="law-item">
+          <span class="law-num">一</span>
+          <div><h3>中央寫核心目標</h3><p>一句具體、敢寫出來的目標,放在九宮格正中央。</p></div>
+        </div>
+        <div class="law-item">
+          <span class="law-num">二</span>
+          <div><h3>周圍八格寫子目標</h3><p>支撐核心目標的八個面向。想不出來的格子,留白交給 AI。</p></div>
+        </div>
+        <div class="law-item">
+          <span class="law-num">三</span>
+          <div><h3>每個子目標再拆八個行動</h3><p>展開成完整的 81 格,每個行動都小到今天就能開始做。</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="sec-kicker">著名案例</p>
+      <h2>高一那年的一張表</h2>
+      <p class="prose">大谷翔平在花卷東高校一年級時,於監督佐佐木洋的指導下,填過一張目標達成表:中央寫著「8 球團第一指名」,周圍八格是體格、控球、球質、球速 160km、變化球、運氣、人間性、心理。最常被引用的細節,是「運氣」這一格 —— 底下寫的行動,是撿垃圾、打招呼這類每天都做得到的小事。</p>
+      <div class="ogrid" role="img" aria-label="大谷翔平目標達成表示意:中央為 8 球團第一指名,周圍八格為八個子目標">
+        <div class="ocell">體格</div>
+        <div class="ocell">控球</div>
+        <div class="ocell">球質</div>
+        <div class="ocell">心理</div>
+        <div class="ocell ocell-core">8 球團<br>第一指名</div>
+        <div class="ocell">球速<br>160km</div>
+        <div class="ocell">人間性</div>
+        <div class="ocell ocell-luck"><span>運氣</span><small>撿垃圾、打招呼</small></div>
+        <div class="ocell">變化球</div>
+      </div>
+      <p class="note">內容整理自日本媒體報導(スポーツニッポン、Full-Count 等);格位為示意排列,非原表版面。</p>
+      <div class="card-cta">
+        <button class="btn btn-primary" type="button" data-next>換我寫一張</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 步驟二:填寫 3×3 -->
+  <section data-step="2" hidden>
+    <p class="sec-kicker">步驟二 · 填寫</p>
+    <h2>寫下你的九宮格</h2>
+    <p class="step-hint">中央是核心目標,周圍八格是支撐它的子目標。想到什麼就寫;寫不出來的格子留白,下一步交給 AI。每一筆都即時保存在你的瀏覽器。</p>
+    <div class="grid3" id="grid3"></div>
+    <div class="step-nav">
+      <button class="btn btn-ghost" type="button" data-back>回上一步</button>
+      <button class="btn btn-primary" type="button" data-next>下一步:AI 補完</button>
+    </div>
+  </section>
+
+  <!-- 步驟三:AI 補完 + 81 格檢視 -->
+  <section data-step="3" hidden>
+    <p class="sec-kicker">步驟三 · AI 補完</p>
+    <h2>讓 AI 接手空格</h2>
+    <p class="step-hint">你寫的格子一字不動;留白的格子,由 AI 依你的核心目標補滿。AI 補的格子帶「AI」徽章,可以直接改字,也可以單格重抽。</p>
+
+    <div class="card">
+      <div class="ai-actions">
+        <button class="btn btn-primary" type="button" id="ai-fill">AI 補滿空格</button>
+        <button class="btn btn-ghost" type="button" id="ai-expand">AI 展開 81 格</button>
+        <span class="ai-progress" id="ai-progress" hidden></span>
+      </div>
+      <p class="ai-msg" id="ai-msg" role="status" hidden></p>
+    </div>
+
+    <h3 class="sub-head">你的九宮格</h3>
+    <div class="grid3 aigrid" id="aigrid"></div>
+
+    <div class="grid9-bar">
+      <button class="btn btn-ghost" type="button" id="grid9-toggle">檢視完整 81 格</button>
+    </div>
+    <div id="grid9-wrap" hidden>
+      <p class="step-hint">外圈八個區塊的中心,鏡像對應你的八個子目標;周圍的行動格現在就能手寫,AI 展開之後也只會補空格。</p>
+      <div class="grid9-scroll">
+        <div class="grid9" id="grid9"></div>
+      </div>
+    </div>
+
+    <div class="step-nav">
+      <button class="btn btn-ghost" type="button" data-back>回上一步</button>
+      <button class="btn btn-primary" type="button" data-next>下一步:做成桌布</button>
+    </div>
+  </section>
+
+  <!-- 步驟四:桌布合成 + AI 背景 -->
+  <section data-step="4" hidden>
+    <p class="sec-kicker">步驟四 · 桌布</p>
+    <h2>挑一種風格</h2>
+    <p class="step-hint">選擇方向、格局與風格,預覽即時重繪;AI 背景是加分項,沒有 AI 服務時,風格漸層一樣能完成桌布。</p>
+
+    <div class="card">
+      <h3 class="panel-label">方向</h3>
+      <div class="seg" role="group" aria-label="桌布方向">
+        <button type="button" data-orient="portrait">直式 · 手機</button>
+        <button type="button" data-orient="landscape">橫式 · 桌面</button>
+      </div>
+      <h3 class="panel-label">格局</h3>
+      <div class="seg" role="group" aria-label="桌布格局">
+        <button type="button" data-wmode="3x3">3×3 九宮格</button>
+        <button type="button" data-wmode="9x9">9×9 全圖</button>
+      </div>
+      <p class="note" id="wmode-note">先在步驟三展開 81 格,就能選 9×9 全圖版型。</p>
+      <h3 class="panel-label">風格</h3>
+      <div class="style-grid" id="style-list"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="panel-label">預覽</h3>
+      <div class="wall-preview" id="wall-preview">
+        <canvas id="wallpaper-canvas" aria-label="桌布預覽"></canvas>
+      </div>
+      <p class="note">文字、配色、方向、格局改動都會即時重繪,不需要重新生圖。</p>
+    </div>
+
+    <div class="card">
+      <h3 class="panel-label">AI 背景(選配)</h3>
+      <div class="refs-list" id="refs-list"></div>
+      <div class="ai-actions">
+        <label class="btn btn-ghost ref-add" id="refs-add">上傳參考圖(至多 3 張)<input type="file" id="refs-input" accept="image/*" multiple hidden></label>
+        <button class="btn btn-primary" type="button" id="bg-generate">生成 AI 背景</button>
+      </div>
+      <div class="genbar" id="genbar" hidden>
+        <div class="pbar"><i id="pbar-fill"></i></div>
+        <p class="gen-stage" id="gen-stage"></p>
+      </div>
+      <div class="edit-row" id="bg-edit-row" hidden>
+        <input type="text" id="bg-edit-input" placeholder="例:整體亮一點,天空加一點晚霞" aria-label="背景修改指示">
+        <button class="btn btn-ghost" type="button" id="bg-edit">AI 修改背景</button>
+      </div>
+      <p class="ai-msg" id="bg-msg" role="status" hidden></p>
+      <p class="note">生成約需一到三分鐘;參考圖與成品只存在你自己的瀏覽器(IndexedDB)。</p>
+    </div>
+
+    <!-- R8:prompt 外帶降級方案 — 零後端依賴,站方服務全掛也能走完全程 -->
+    <details class="card export-panel" id="export-panel">
+      <summary>服務忙線或想自己生?</summary>
+      <div class="export-body">
+        <p class="prose">生圖 prompt 是可攜帶的資產:複製下面這份 prompt,貼到 ChatGPT 或 Gemini 自己生成;想用參考圖,把圖一併附給它。生成後下載圖片,再用「匯入背景圖」放回這裡,後面的文字合成完全相同。</p>
+        <div class="ai-actions">
+          <button class="btn btn-primary" type="button" id="copy-prompt">複製生圖 prompt</button>
+          <label class="btn btn-ghost ref-add" id="import-bg-label">匯入背景圖<input type="file" id="import-bg-input" accept="image/png,image/jpeg,image/webp" hidden></label>
+        </div>
+        <textarea class="export-prompt-text" id="export-prompt-text" rows="9" readonly hidden aria-label="生圖 prompt 全文" spellcheck="false"></textarea>
+        <p class="ai-msg" id="export-msg" role="status" hidden></p>
+        <p class="note">匯入支援 PNG、JPG、WebP;圖片同樣只存在你自己的瀏覽器(IndexedDB)。</p>
+      </div>
+    </details>
+
+    <div class="step-nav">
+      <button class="btn btn-ghost" type="button" data-back>回上一步</button>
+      <button class="btn btn-primary" type="button" data-next>下一步:下載帶走</button>
+    </div>
+  </section>
+
+  <!-- 步驟五:下載 + 留資 -->
+  <section data-step="5" hidden>
+    <p class="sec-kicker">步驟五 · 帶走</p>
+    <h2>帶走你的九宮格</h2>
+
+    <div class="card">
+      <h3 class="panel-label">下載桌布</h3>
+      <p class="prose">完成的桌布直接下載 PNG —— 不用留下任何資料。</p>
+      <button class="btn btn-primary" type="button" id="download-png">下載 PNG</button>
+      <p class="note" id="download-note" hidden></p>
+      <details class="howto">
+        <summary>設成桌布教學:下載之後怎麼用?</summary>
+        <div class="howto-body">
+          <p><strong>iOS</strong>:照片 App 開啟這張圖 → 點分享 → 設為桌布。</p>
+          <p><strong>Android</strong>:長按桌面空白處 → 桌布 → 從相簿選這張圖。</p>
+          <p><strong>桌面電腦</strong>:對下載的圖檔按右鍵 → 設為背景。</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3 class="panel-label">30 天行動追蹤模板</h3>
+      <p class="prose">留下 Email,立即拿「30 天行動追蹤模板」—— 把九宮格裡的行動,變成每天可以打勾的清單,送出後馬上給連結。</p>
+      <form class="signup-form" id="signup-form" novalidate>
+        <input type="email" name="email" id="signup-email" autocomplete="email" placeholder="you@example.com" aria-label="Email">
+        <input type="text" name="company" id="signup-company" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn btn-primary" type="submit" id="signup-submit">送出拿模板</button>
+      </form>
+      <p class="ai-msg" id="signup-msg" role="status" hidden></p>
+      <div class="gift" id="signup-gift" hidden>
+        <a class="btn btn-primary" id="signup-gift-link" href="#" target="_blank" rel="noopener">開啟 30 天行動追蹤模板</a>
+        <p class="note">模板會讀取你存在這台瀏覽器裡的子目標;按 Ctrl+P / Cmd+P 就能印成 A4 紙本。</p>
+      </div>
+      <p class="note">送出即同意收到課程相關信件,隨時可退訂;Email 只用於名單,不會出現在桌布或模板上。</p>
+    </div>
+
+    <div class="step-nav">
+      <button class="btn btn-ghost" type="button" data-back>回上一步</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot wrap">
+  <details class="byo" id="byo-panel">
+    <summary>進階設定:自帶金鑰(BYO)與服務位址</summary>
+    <div class="byo-body">
+      <p class="note byo-note">這些設定只存在你瀏覽器的 localStorage,不會上傳到任何地方。填入自己的金鑰後,AI 功能改走你自己的額度;留空則走站方服務。</p>
+      <label class="byo-field">Worker 網址(自部署時填)
+        <input id="byo-worker" type="url" placeholder="https://goal-grid.yazelinj303.workers.dev" autocomplete="off">
+      </label>
+      <label class="byo-field">Groq API Key(AI 補格直連)
+        <input id="byo-groq" type="password" placeholder="gsk_..." autocomplete="off">
+      </label>
+      <label class="byo-field">codex-image-service Key(生圖直連:只填這個 key 即可)
+        <input id="byo-codex-key" type="password" placeholder="cimg_..." autocomplete="off">
+      </label>
+      <label class="byo-field">codex-image-service 網址(留空用預設 ching-tech.ddns.net/codex-image;自架才填)
+        <input id="byo-codex-url" type="url" placeholder="https://ching-tech.ddns.net/codex-image" autocomplete="off">
+      </label>
+      <label class="byo-field">Turnstile sitekey(有設才做人機驗證)
+        <input id="byo-sitekey" type="text" autocomplete="off">
+      </label>
+      <div class="ai-actions byo-actions">
+        <button class="btn btn-primary" type="button" id="byo-save">儲存設定</button>
+        <button class="btn btn-ghost" type="button" id="byo-clear">清除全部</button>
+        <span class="byo-msg" id="byo-msg" role="status"></span>
+      </div>
+    </div>
+  </details>
+  <p class="foot-brand">目標九宮格 <span>GOAL GRID</span></p>
+  <p>本工具使用的九宮格目標法,源自原田隆史的「原田メソッド」(Open Window 64);大谷翔平高中時期填寫的目標達成表,是這個方法最著名的案例。</p>
+  <p lang="ja">「マンダラチャート」は一般社団法人マンダラチャート協会の登録商標です。</p>
+  <p>本站為課程「AI 互動行銷頁實戰 — 目標九宮格」的成品範例,與上述協會及相關團體均無關聯。</p>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

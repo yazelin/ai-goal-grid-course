@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Cpath d=%27M6 3h1v10H6zM9 3h1v10H9zM3 6h10v1H3zM3 9h10v1H3z%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>前課銜接 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+/* 夜空製圖室 主題覆寫(沿用 deck.css 類別體系,僅換色) */
+:root{
+  --ink:#0e1420; --pine:#16243c; --moss:#1d2f4e; --mist:#8fa1bd;
+  --cream:#e9edf5; --paper:#dce3ef; --copper:#c9a44e; --copper-d:#a8893f;
+}
+.bar{color:rgba(143,161,189,.7)}
+.bar a{color:rgba(201,164,78,.85)}
+.slide{background:
+  radial-gradient(120% 90% at 85% -15%, rgba(143,161,189,.12), transparent 55%),
+  radial-gradient(90% 70% at 0% 115%, rgba(201,164,78,.09), transparent 50%),
+  var(--ink)}
+ul.points li{border-bottom-color:rgba(143,161,189,.16)}
+pre{background:rgba(10,15,26,.72); border-color:rgba(143,161,189,.25); border-left-color:var(--copper)}
+th,td{border-bottom-color:rgba(143,161,189,.2)}
+.demo-tag{border-color:rgba(201,164,78,.5)}
+.progress{background:rgba(143,161,189,.12)}
+.navhint{color:rgba(143,161,189,.45)}
+</style>
+</head>
+<body>
+<header class="bar"><span>AI 互動行銷頁實戰 — 目標九宮格 — 前課銜接</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI GOAL GRID COURSE — 00b 前課銜接</p>
+  <h1>四個會一直用到的<em>零件</em></h1>
+  <p class="sub">本課假設你上過「AI 互動行銷頁實作課」。這份用半頁複習四個核心,每段附前課傳送門。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">怎麼用這一章</p>
+  <p class="big">四段都覺得「嗯,我知道」,<br>就<em>直接開工</em>;卡住的那段,回前課十分鐘補完。</p>
+</section>
+
+<section class="slide">
+  <h2>零件 1:GitHub Pages — <em>資料夾變網址</em></h2>
+  <ul class="points">
+    <li>repo 放 index.html → Settings → Pages → Branch 選 main、/ (root)</li>
+    <li>一兩分鐘後拿到 <strong>https://你的帳號.github.io/repo名/</strong></li>
+    <li>改版 = 重新 commit,稍等就生效</li>
+    <li>本課的成品 app 與所有 demo 都是這樣上線的</li>
+    <li class="dim">複習:前課模組 5「上線:部署決策樹 + GitHub Pages」</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>零件 2:Worker — 幫頁面<em>藏 key</em> 的免費代理</h2>
+  <pre>訪客瀏覽器 ──> Cloudflare Worker(key 藏在 Secret)──> AI API
+ GitHub Pages          免費 10 萬次/天</pre>
+  <p class="code-note">API key 等於信用卡:放進網頁,任何人按 F12 都看得到。解法是中間加一個 Worker,key 藏在 Secret 裡。複習:前課模組 6「頁面即時呼叫 AI」。</p>
+</section>
+
+<section class="slide">
+  <h2>本課升級:一個 Worker <em>三個職責</em></h2>
+  <pre>goal-grid Worker
+ ├ POST /fill    → AI 補格(Groq)
+ ├ POST /image   → 生圖代理(長任務 job)
+ └ POST /signup  → 收名單(D1 資料庫)</pre>
+  <p class="code-note">前課一個 Worker 做一件事;本課從第 03 章起,逐章把這三條路由蓋出來。</p>
+</section>
+
+<section class="slide">
+  <h2>零件 3:AI prompt <em>範本</em>的用法</h2>
+  <ul class="points">
+    <li>用<strong>【】分節</strong>把 brief 寫清楚:要什麼、資料長怎樣、風格、驗收標準</li>
+    <li>整段貼給 ChatGPT / Claude → 存檔開啟、<strong>逐項驗收</strong></li>
+    <li>修改靠對話下指令,一次只改一兩件事</li>
+    <li>你是總監,AI 是工讀生,<strong>驗收清單就是你的武器</strong></li>
+    <li class="dim">複習:前課模組 1「第一個活動頁」、模組 8「Prompt 兵法」</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>零件 4:demo 09 的 <em>email 收集</em>模式</h2>
+  <pre>報名頁 ──POST email──> Worker ──寫入──> D1(UNIQUE 去重)
+                         │ email 格式驗證 / honeypot / 每 IP 限流
+admin 後台 ──Bearer token──> 看名單 / 匯出 CSV</pre>
+  <p class="code-note">本課第 09 章直接沿用這個模式,再加上 Turnstile 與「留 email 當場拿模板」的誘因設計。複習:前課模組 9「收 email 名單」。</p>
+</section>
+
+<section class="slide">
+  <h2>30 秒<em>自我檢查</em></h2>
+  <ul class="points">
+    <li>我能在十分鐘內把一個資料夾變成公開網址 <span class="dim">(不行 → 模組 5)</span></li>
+    <li>我說得出「為什麼 API key 不能放進網頁」 <span class="dim">(說不出 → 模組 6)</span></li>
+    <li>我貼過【】分節的 prompt,並照清單驗收過成品 <span class="dim">(沒有 → 模組 1、8)</span></li>
+    <li>我知道 honeypot 跟 admin token 各在防什麼 <span class="dim">(不知道 → 模組 9)</span></li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>四個零件全程用:<strong>Pages 上線、Worker 藏 key、【】prompt、email 收集模式</strong></li>
+    <li>本課把它們組成一個產品:一個 Worker 三個職責</li>
+    <li>四項自我檢查都打勾,就可以開工</li>
+  </ul>
+  <span class="demo-tag">下一章 01 — 不寫程式:行銷人必修的命名安檢</span>
+</section>
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

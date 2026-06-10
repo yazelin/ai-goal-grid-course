@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 04 章 圖片上傳與前端縮圖 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 04 章 — 圖片上傳與前端縮圖</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 — 第 04 章</p>
+  <h1>圖片上傳與前端縮圖:<br>在瀏覽器裡<em>先把圖變小</em></h1>
+  <p class="sub">學完:讓使用者選照片當 AI 參考圖,在瀏覽器裡縮小、轉 base64、存進 IndexedDB——重新整理照片還在。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">參考圖是<em>給 AI 看的</em>,不是要印海報。<br>長邊 1280 跟 4000×3000 原圖,AI 理解到的幾乎一樣,檔案差<em>十倍以上</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>這章要接起來的<em>管線</em></h2>
+  <ul class="points">
+    <li><strong>選檔</strong>:一個 input,手機直接開相簿</li>
+    <li><strong>縮圖</strong>:解碼 → 畫到 canvas → 輸出 JPEG</li>
+    <li><strong>轉 base64</strong>:API 要純字串,前綴要切掉</li>
+    <li><strong>存 IndexedDB</strong>:重新整理照片還在</li>
+    <li><strong>顯示縮圖</strong>:借用記憶體網址 <span class="dim">createObjectURL</span></li>
+  </ul>
+  <p class="sub">原則只有一句:在瀏覽器裡先縮,再上傳。瀏覽器本身就是一台夠用的影像處理器。</p>
+</section>
+
+<section class="slide">
+  <h2>選檔:一個 input 就夠</h2>
+  <pre>&lt;input id="refs-input" type="file" accept="image/*" multiple&gt;</pre>
+  <ul class="points">
+    <li><strong>accept="image/*"</strong>:手機直接開相簿</li>
+    <li><strong>multiple</strong>:一次選多張</li>
+    <li>本專案限制<strong>最多 3 張</strong><span class="dim">(上游生圖服務的約定)</span>,滿了就停用 input</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>縮圖:解碼 → canvas → JPEG</h2>
+  <pre>// 長邊縮到 maxEdge,輸出 JPEG blob(app/js/wallpaper.js)
+export async function resizeImageBlob(blob, maxEdge = 1280, quality = 0.85) {
+  const bitmap = await createImageBitmap(blob);   // 1. 解碼成點陣圖
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const c = document.createElement('canvas');     // 2. 開縮小後尺寸的畫布
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bitmap, 0, 0, w, h); // 3. 畫上去 = 縮放完成
+  bitmap.close();
+  return new Promise((resolve, reject) =&gt; {
+    c.toBlob((out) =&gt; out ? resolve(out) : reject(new Error('縮圖失敗')),
+      'image/jpeg', quality);                     // 4. 輸出 85% JPEG
+  });
+}</pre>
+  <p class="code-note">Math.min(1, ...) 只縮小、不放大。一張 8MB 手機原圖走完通常剩 150-400KB,肉眼看內容沒差。</p>
+</section>
+
+<section class="slide">
+  <h2>轉 base64:把前綴切掉</h2>
+  <pre>data:image/jpeg;base64,/9j/4AAQSkZJRg...
+└────── 前綴 ──────────┘└── 真正的 base64 ──
+
+// Blob → 純 base64(app/js/wallpaper.js)
+export function blobToBase64(blob) {
+  return new Promise((resolve, reject) =&gt; {
+    const reader = new FileReader();
+    reader.onload = () =&gt; resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () =&gt; reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}</pre>
+  <p class="code-note">去不去前綴沒有對錯,純看 API 怎麼約:文件說收 data URL 就留著,說收 raw base64 就切掉。撞到 400 時第一個檢查這裡。</p>
+</section>
+
+<section class="slide">
+  <h2>為什麼一定要前端先縮:<em>算給你看</em></h2>
+  <table>
+    <tr><th>路線</th><th>單張</th><th>三張 base64 後</th><th>結果</th></tr>
+    <tr><td>原圖直傳</td><td>6MB</td><td>約 24MB <span class="dim">(base64 膨脹 33%)</span></td><td>撞爆 20MB 請求上限,連 AI 的面都沒見到</td></tr>
+    <tr><td>先縮長邊 1280</td><td>約 300KB</td><td>約 1.2MB</td><td>幾秒傳完,離所有上限都遠</td></tr>
+  </table>
+  <p class="sub">就算過了 20MB,Worker 還有一道驗證:每張 base64 超過 4MB 回 400。體積問題在最靠近源頭的地方解決最便宜——源頭就是使用者的瀏覽器。</p>
+</section>
+
+<section class="slide">
+  <h2>存哪裡?localStorage <em>不行</em></h2>
+  <div class="cols">
+    <div>
+      <h3>localStorage(第 2 章存文字用)</h3>
+      <ul>
+        <li>只能存字串 → 圖得轉 base64,再膨脹 33%</li>
+        <li>配額約 5-10MB,兩三張就滿</li>
+        <li>滿了之後整個 app 的狀態保存跟著壞</li>
+      </ul>
+    </div>
+    <div>
+      <h3>IndexedDB(圖片一律放這)</h3>
+      <ul>
+        <li>直接存 Blob(二進位圖檔)</li>
+        <li>空間以 GB 計</li>
+        <li>開庫樣板寫一次,包成 idbPut / idbAll / idbDelete 到處用</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>串起來:上傳流程</h2>
+  <pre>refsInput.addEventListener('change', async () =&gt; {
+  const files = [...refsInput.files].slice(0, 3 - refRecords.length); // 最多 3 張
+  refsInput.value = '';
+  for (const file of files) {
+    try {
+      const blob = await resizeImageBlob(file, 1280); // 先縮,控制 body 體積
+      await idbPut('refs', { blob, meta: { name: file.name },
+                             createdAt: new Date().toISOString() });
+    } catch {
+      showMsg(bgMsgEl, '這張圖讀不進來,請換一張(支援一般圖片格式)。');
+    }
+  }
+  loadRefs(); // 重新從 IndexedDB 讀出來畫縮圖列表
+});</pre>
+  <p class="code-note">try/catch 是必需品:部分格式(例如某些 HEIC)解不開會丟錯——接住、給一句人話,不要讓整個頁面停擺。</p>
+</section>
+
+<section class="slide">
+  <h2>顯示縮圖:借用記憶體網址</h2>
+  <pre>const img = document.createElement('img');
+img.src = URL.createObjectURL(r.blob);
+img.addEventListener('load', () =&gt; URL.revokeObjectURL(img.src), { once: true });</pre>
+  <ul class="points">
+    <li>createObjectURL 每呼叫一次就佔一塊記憶體</li>
+    <li>圖<strong>載入完就 revoke</strong>,列表重畫幾十次頁面也不會越來越肥</li>
+    <li>到這裡管線完工:選檔 → 縮圖 → 存 IndexedDB → 顯示;要送 AI 時再 blobToBase64</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>原圖直接 base64 上傳</strong> → 三張就撞破 20MB,先縮再傳沒有例外</li>
+    <li><strong>忘記去 data URL 前綴</strong> → API 收純 base64 時必 400,split(',')[1] 一行的事</li>
+    <li><strong>iPhone HEIC 解不開</strong> → try/catch + 人話提示「請換一張」</li>
+    <li><strong>拿 localStorage 存圖</strong> → 配額爆掉連狀態保存一起壞</li>
+    <li><strong>createObjectURL 沒釋放</strong> → 記憶體越吃越多,load 後就 revoke</li>
+    <li><strong>放大小圖</strong> → 忘了 Math.min(1, ...),糊了還變大;只縮不放</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>參考圖是給 AI 看的:<strong>在瀏覽器裡先縮,再上傳</strong></li>
+    <li>縮圖管線:createImageBitmap → canvas → toBlob('image/jpeg', 0.85)</li>
+    <li>base64 前綴去留<strong>看 API 約定</strong>,400 先查這裡</li>
+    <li>圖片存 <strong>IndexedDB</strong>(存 Blob、GB 級),文字才用 localStorage</li>
+    <li>解碼失敗要接住,給人話、不停擺</li>
+  </ul>
+  <p class="sub">下一章:AI 桌布背景——一張圖要生 1-3 分鐘,長任務的正確姿勢是 job + 輪詢 + 一條等得下去的進度條。</p>
+  <span class="demo-tag">對照成品:app/js/wallpaper.js · app/js/state.js · app/js/main.js(搜尋 refsInput)</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

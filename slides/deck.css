@@ -1,0 +1,103 @@
+/* 上課簡報共用樣式 — 山霧課程版(深墨綠 + 奶油白 + 銅棕) */
+:root{
+  --ink:#10221d; --pine:#1d4438; --moss:#2e5c4d; --mist:#9db8ae;
+  --cream:#f4efe4; --paper:#ece5d4; --copper:#c98f4e; --copper-d:#a8743a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  background:var(--ink); color:var(--cream); overflow:hidden;
+}
+::selection{background:var(--copper); color:var(--ink)}
+
+.bar{
+  position:fixed; top:0; left:0; right:0; z-index:10;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:1rem 2.2rem; font-size:.7rem; letter-spacing:.3em; color:rgba(157,184,174,.7);
+}
+.bar a{color:rgba(201,143,78,.8); text-decoration:none}
+
+.slide{
+  position:absolute; inset:0; display:none;
+  flex-direction:column; justify-content:center;
+  padding:8vh 9vw;
+  background:
+    radial-gradient(120% 90% at 85% -15%, rgba(157,184,174,.13), transparent 55%),
+    radial-gradient(90% 70% at 0% 115%, rgba(201,143,78,.10), transparent 50%),
+    var(--ink);
+}
+.slide.active{display:flex; animation:slidein .45s both}
+@keyframes slidein{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+
+.kicker{font-size:.78rem; letter-spacing:.42em; color:var(--copper); margin-bottom:1.6rem}
+h1{
+  font-family:"Noto Serif TC","PMingLiU",serif; font-weight:600;
+  font-size:clamp(2.4rem,6vw,4.6rem); line-height:1.25;
+}
+h1 em{font-style:normal; color:var(--copper)}
+h2{
+  font-family:"Noto Serif TC",serif; font-weight:600;
+  font-size:clamp(1.8rem,4vw,3rem); line-height:1.35; margin-bottom:2.4rem;
+}
+h2 em{font-style:normal; color:var(--copper)}
+.sub{color:var(--mist); font-size:clamp(1rem,1.8vw,1.25rem); line-height:2; max-width:34em; margin-top:1.4rem}
+
+ul.points{list-style:none; max-width:54rem}
+ul.points li{
+  font-size:clamp(1.05rem,2vw,1.5rem); line-height:1.8; color:var(--cream);
+  padding:.85rem 0 .85rem 2.2rem; position:relative;
+  border-bottom:1px solid rgba(157,184,174,.14);
+}
+ul.points li::before{content:"—"; position:absolute; left:0; color:var(--copper)}
+ul.points li strong{color:var(--copper); font-weight:700}
+ul.points li .dim{color:var(--mist); font-size:.85em}
+
+.slide.statement{align-items:flex-start}
+.statement p.big{
+  font-family:"Noto Serif TC",serif; font-weight:600;
+  font-size:clamp(1.9rem,4.6vw,3.4rem); line-height:1.6; max-width:22em;
+}
+.statement p.big em{font-style:normal; color:var(--copper)}
+
+pre{
+  background:rgba(16,34,29,.7); border:1px solid rgba(157,184,174,.25);
+  border-left:3px solid var(--copper); border-radius:6px;
+  padding:1.6rem 1.8rem; max-width:60rem; max-height:62vh; overflow:auto;
+  font-family:"JetBrains Mono","Courier New",monospace;
+  font-size:clamp(.78rem,1.35vw,1.02rem); line-height:1.75; color:var(--paper);
+  white-space:pre-wrap;
+}
+.code-note{margin-top:1.2rem; color:var(--mist); font-size:.95rem; line-height:1.8}
+
+table{border-collapse:collapse; max-width:58rem; font-size:clamp(.9rem,1.6vw,1.15rem)}
+th,td{padding:.8rem 1.3rem; text-align:left; border-bottom:1px solid rgba(157,184,174,.2); line-height:1.7}
+th{color:var(--copper); font-weight:700; letter-spacing:.08em; font-size:.85em}
+td{color:var(--cream)} td .dim{color:var(--mist)}
+
+.cols{display:grid; grid-template-columns:1fr 1fr; gap:3.5rem; max-width:64rem}
+.cols h3{font-family:"Noto Serif TC",serif; color:var(--copper); font-size:1.25rem; margin-bottom:1rem}
+.cols p,.cols li{color:var(--cream); line-height:1.9; font-size:1.05rem}
+.cols ul{list-style:none}
+.cols li{padding-left:1.4rem; position:relative; margin-bottom:.5rem}
+.cols li::before{content:"—"; position:absolute; left:0; color:var(--copper)}
+
+.demo-tag{
+  display:inline-block; margin-top:2.2rem; font-size:.8rem; letter-spacing:.2em;
+  color:var(--copper); border:1px solid rgba(201,143,78,.5); border-radius:99px;
+  padding:.5rem 1.3rem;
+}
+
+.progress{position:fixed; bottom:0; left:0; right:0; height:3px; background:rgba(157,184,174,.12); z-index:10}
+.progress i{display:block; height:100%; width:0; background:var(--copper); transition:width .35s}
+.navhint{
+  position:fixed; bottom:1.1rem; right:2.2rem; z-index:10;
+  font-size:.68rem; letter-spacing:.2em; color:rgba(157,184,174,.45);
+}
+
+/* 列印 / 轉 PDF:全部攤平,一頁一張 */
+@media print{
+  body{overflow:visible; background:var(--ink)}
+  .slide{display:flex !important; position:relative; inset:auto; height:100vh; page-break-after:always; animation:none}
+  .bar,.progress,.navhint{display:none}
+}

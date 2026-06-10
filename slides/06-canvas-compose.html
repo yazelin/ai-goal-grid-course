@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 06 章 canvas 文字合成 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 06 章 — canvas 文字合成</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 — 第 06 章</p>
+  <h1>canvas 文字合成:<br><em>AI 畫背景</em>,<em>canvas 畫字</em></h1>
+  <p class="sub">學完:親手重現「叫 AI 畫中文字」的翻車現場,然後用 canvas 把九宮格文字一字不差地疊在任何背景上,輸出可下載的 PNG 桌布。</p>
+</section>
+
+<section class="slide">
+  <h2>先翻車給你看:叫 AI <em>連中文字一起畫</em></h2>
+  <pre>畫一張 3×3 的目標九宮格表格圖,深藍色底、金色框線。
+中央格寫「完成全馬 42.195km」,
+周圍八格依序寫:「每週跑 40km」「核心訓練」「睡滿 7 小時」
+「補給策略」「配速練習」「比賽報名」「飲食管理」「跑姿調整」。
+要求:每一格的繁體中文都清晰可讀、一字不差。</pre>
+  <p class="code-note">五分鐘的對照實驗:貼到 ChatGPT 或 Gemini 任一生圖工具。表格與配色多半有模有樣——湊近看文字。</p>
+</section>
+
+<section class="slide">
+  <h2>三種典型災難</h2>
+  <ul class="points">
+    <li><strong>偽漢字</strong>:筆畫黏成字典裡不存在的字,遠看像中文、近看是亂碼</li>
+    <li><strong>缺字、漏字、多字</strong>:「每週跑 40km」變成「每跑 40」</li>
+    <li><strong>簡繁混雜</strong>:「週」變「周」、「練」變「练」,同一張圖兩種寫法</li>
+    <li>更麻煩:同一個 prompt 重抽三次,<strong>三次錯的地方都不一樣</strong></li>
+    <li>錯得不穩定 = <strong>無法驗收</strong> = 不能放上行銷頁(這還只是 9 格,進階模式是 81 格)</li>
+  </ul>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">為什麼會這樣</p>
+  <p class="big">生圖模型是<em>畫畫的</em>,不是<em>排版的</em>。<br>英文 26 個字母,樣本夠多常常畫得對;常用中文字四、五千個,模型只能畫出「長得像中文的紋理」。<br>這是<em>原理性限制</em>,不是換個新模型就會好。</p>
+</section>
+
+<section class="slide">
+  <h2>核心觀念:<em>分工</em></h2>
+  <div class="cols">
+    <div>
+      <h3>AI 負責它擅長的</h3>
+      <ul>
+        <li>氛圍、光線、風格、構圖</li>
+        <li>生成一張沒有任何文字的背景</li>
+        <li>生圖 prompt 鐵律:Do NOT render any text</li>
+      </ul>
+    </div>
+    <div>
+      <h3>程式負責機器擅長的</h3>
+      <ul>
+        <li>精準、可驗收的文字排版</li>
+        <li>canvas 把九宮格一格一格畫上去</li>
+        <li>兩層合成輸出 PNG</li>
+      </ul>
+    </div>
+  </div>
+  <p class="sub">這個解耦還有一個下一章才兌現的紅利:改文字不必重新生圖,迭代零成本。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟一:開一張「輸出尺寸」的 canvas</h2>
+  <pre>const CANVAS = { portrait:  { w: 1170, h: 2532 },   // iPhone 等級桌布解析度
+                 landscape: { w: 1920, h: 1080 } };
+
+const { w: W, h: H } = CANVAS[orientation];
+canvas.width = W;    // 這是輸出畫素,不是 CSS 樣式
+canvas.height = H;
+const ctx = canvas.getContext('2d');</pre>
+  <p class="code-note">canvas.width 是輸出畫素、CSS 的 width 只是顯示大小,兩者各管各的。預覽用 CSS 縮小顯示即可,輸出尺寸不受影響——只設 CSS 會得到一張 300×150 的糊圖。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟二:背景 cover 縮放鋪滿</h2>
+  <pre>// 跟 CSS 的 background-size: cover 同一個邏輯:蓋滿、超出置中裁掉
+function coverRect(srcW, srcH, dstW, dstH) {
+  const scale = Math.max(dstW / srcW, dstH / srcH);
+  const sw = dstW / scale;
+  const sh = dstH / scale;
+  return { sx: (srcW - sw) / 2, sy: (srcH - sh) / 2, sw, sh };
+}
+
+const { sx, sy, sw, sh } = coverRect(bgBitmap.width, bgBitmap.height, W, H);
+ctx.drawImage(bgBitmap, sx, sy, sw, sh, 0, 0, W, H); // 九參數形式</pre>
+  <p class="code-note">這個函式不挑圖:任何比例丟進來都能鋪滿——下一章「匯入背景圖」靠的就是它。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟三:暗化遮罩,可讀性<em>不賭 AI 聽話</em></h2>
+  <pre>// 保險一:全幅半透明暗化遮罩
+ctx.fillStyle = 'rgba(8, 10, 16, 0.30)';
+ctx.fillRect(0, 0, W, H);
+
+// 保險二:每一格自己再墊一層更深的格底(畫格子時用)
+const CELL_BG = 'rgba(12, 16, 24, 0.58)';</pre>
+  <ul class="points">
+    <li>prompt 雖然要求「中央區域低對比留白」,但模型<strong>不一定每次聽話</strong></li>
+    <li>雙保險之後:不管背景多花,字底下永遠是深色,白字一定讀得到</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>步驟四:fitText——二分搜尋<em>塞得下的最大字級</em></h2>
+  <pre>const tryFit = (fs) =&gt; {
+  const measure = measureFactory(fs);             // 該字級下的量寬函式
+  const lines = wrapCJK(text, maxWidth, measure); // 先斷行(下一頁)
+  const ok = lines.length * fs * lineHeight &lt;= maxHeight
+          &amp;&amp; lines.every((l) =&gt; measure(l) &lt;= maxWidth + 0.01);
+  return ok ? lines : null;
+};
+let lo = minFontSize, hi = maxFontSize, best = null;
+while (lo &lt;= hi) {                                // 二分搜尋
+  const mid = (lo + hi) &gt;&gt; 1;
+  const lines = tryFit(mid);
+  if (lines) { best = { fontSize: mid, lines }; lo = mid + 1; }
+  else { hi = mid - 1; }
+}</pre>
+  <p class="code-note">每格文字長度差很大(「英文」vs「睡前聽英文 podcast」),固定字級必爆版。量字寬用 ctx.measureText——量之前一定要先把 ctx.font 設成要量的字級,不然量到的是上一次的字寬。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟五:中文斷行——逐字可斷,<em>英數段不拆</em></h2>
+  <pre>function wrapCJK(text, maxWidth, measure) {
+  const lines = []; let line = '';
+  const push = (unit) =&gt; {
+    if (line &amp;&amp; measure(line + unit) &gt; maxWidth) { lines.push(line); line = unit; }
+    else { line += unit; }
+  };
+  // 切成「英數段」與「單一字元」兩種單位
+  const units = String(text).match(/[A-Za-z0-9]+|[\s\S]/gu) || [];
+  for (const unit of units) {
+    if (unit.length &gt; 1 &amp;&amp; measure(unit) &gt; maxWidth) {
+      for (const ch of unit) push(ch); // 整段比格子還寬才退回逐字硬拆
+    } else { push(unit); }
+  }
+  lines.push(line);
+  return lines;
+}</pre>
+  <p class="code-note">中文沒有空格、canvas 沒有自動換行。160km、TOEIC、podcast 是不可拆單位,放不下整段移到下一行——拆成 TOE / IC 就不是人話了。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟六:配色慣例——<em>中央格最強色</em></h2>
+  <table>
+    <tr><th>區域</th><th>畫法</th></tr>
+    <tr><td>中央格(核心目標)</td><td>風格主色 85% 不透明度當底 + 3px 同色邊框 + 白色粗體字 <span class="dim">整張圖最強的顏色</span></td></tr>
+    <tr><td>八個子目標格</td><td>深色格底 + 各自一條 4px 彩色左邊條,八格八色</td></tr>
+    <tr><td>9×9 模式外圍區塊</td><td>區塊中心格用對應子目標的同色(填色 32% 透明 + 同色邊框)<span class="dim">一眼看出在展開哪個子目標</span></td></tr>
+  </table>
+  <p class="sub">沿用大谷翔平目標表轉載圖那套大家看慣的配色語言;顏色來自風格預設(styles-presets.js),每個風格帶 accent + sub[8]。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟七:輸出 PNG</h2>
+  <pre>canvas.toBlob((blob) =&gt; {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '目標九宮格.png';
+  a.click();
+  setTimeout(() =&gt; URL.revokeObjectURL(url), 4000);
+}, 'image/png');</pre>
+  <p class="code-note">合成完直接從 canvas 匯出,全程不經過任何伺服器。注意 toBlob 是非同步的,結果在 callback 裡。</p>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>還是想叫 AI 畫字</strong> → 短英文偶爾成功會騙到你;錯的位置每次不一樣 = 無法驗收</li>
+    <li><strong>用 CSS 思維設 canvas 尺寸</strong> → 只設 CSS 得到 300×150 糊圖</li>
+    <li><strong>忘了遮罩</strong> → 別依賴 prompt 的「中央留白」,遮罩 + 格底才是自己的保證</li>
+    <li><strong>measureText 量錯寬</strong> → 量之前沒設 ctx.font,版面時好時壞</li>
+    <li><strong>跨網域圖污染 canvas</strong> → toBlob 丟 SecurityError;先 fetch 回 Blob 存 IndexedDB 再畫,順便解掉網址 7 天過期</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>AI 畫中文字是<strong>原理性限制</strong>:錯得不穩定、無法驗收</li>
+    <li>分工:<strong>AI 畫氛圍、程式畫文字</strong>,兩層合成輸出 PNG</li>
+    <li>canvas 四件套:輸出尺寸、cover 裁切、暗化雙保險、toBlob 下載</li>
+    <li>文字排版兩個演算法:<strong>fitText 二分搜尋字級</strong> + <strong>wrapCJK 英數段不拆</strong></li>
+    <li>配色慣例:中央格最強色、八格八色、9×9 區塊同色呼應</li>
+  </ul>
+  <p class="sub">下一章:AI 編輯迴圈——「整體亮一點」怎麼改背景?以及當生圖服務掛掉時,prompt 如何變成可攜帶的資產讓漏斗走得完。</p>
+  <span class="demo-tag">對照成品:demos/03-wallpaper/ · app/js/wallpaper.js(9×9 全圖版型 + 風格預設)</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

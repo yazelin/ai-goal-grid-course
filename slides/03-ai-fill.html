@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Cpath d=%27M6 3h1v10H6zM9 3h1v10H9zM3 6h10v1H3zM3 9h10v1H3z%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 03 章 AI 補格 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+/* 夜空製圖室 主題覆寫(沿用 deck.css 類別體系,僅換色) */
+:root{
+  --ink:#0e1420; --pine:#16243c; --moss:#1d2f4e; --mist:#8fa1bd;
+  --cream:#e9edf5; --paper:#dce3ef; --copper:#c9a44e; --copper-d:#a8893f;
+}
+.bar{color:rgba(143,161,189,.7)}
+.bar a{color:rgba(201,164,78,.85)}
+.slide{background:
+  radial-gradient(120% 90% at 85% -15%, rgba(143,161,189,.12), transparent 55%),
+  radial-gradient(90% 70% at 0% 115%, rgba(201,164,78,.09), transparent 50%),
+  var(--ink)}
+ul.points li{border-bottom-color:rgba(143,161,189,.16)}
+pre{background:rgba(10,15,26,.72); border-color:rgba(143,161,189,.25); border-left-color:var(--copper)}
+th,td{border-bottom-color:rgba(143,161,189,.2)}
+.demo-tag{border-color:rgba(201,164,78,.5)}
+.progress{background:rgba(143,161,189,.12)}
+.navhint{color:rgba(143,161,189,.45)}
+</style>
+</head>
+<body>
+<header class="bar"><span>AI 互動行銷頁實戰 — 目標九宮格 — 第 03 章</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI GOAL GRID COURSE — 第 03 章</p>
+  <h1>AI 補格:<em>Worker + LLM JSON</em> 輸出</h1>
+  <p class="sub">留空的格子交給 AI,自己填的格子一字不動 — prompt 設計與程式驗收的雙保險。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">產品立場</p>
+  <p class="big"><em>null 是授權</em>,有字是主權。<br>AI 是教練,不是代筆。</p>
+</section>
+
+<section class="slide">
+  <h2>學完<em>能做什麼</em></h2>
+  <ul class="points">
+    <li>加一顆「<strong>AI 補滿空格</strong>」按鈕:只填空格,手填的一字不動</li>
+    <li>看懂並改寫一份「<strong>會回 JSON 的 prompt</strong>」— 所有「AI 結果要進程式」場景的共通技能</li>
+    <li>知道為什麼 AI 失敗時要「<strong>退還額度</strong>」,以及程式裡長什麼樣</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>觀念:這次是<em>程式在讀</em></h2>
+  <ul class="points">
+    <li>前課的聊天小幫手:AI 愛怎麼回都行 — <strong>人在讀</strong></li>
+    <li>這章:AI 的回答要直接塞回九個格子 — <strong>程式在讀</strong></li>
+    <li>所以:只准輸出 JSON,收到後還要<strong>逐項驗收</strong>(長度、有沒有偷改字)</li>
+    <li>對 AI 的態度跟對廠商一樣:合約寫清楚,驗收不能省</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>架構:key 還是<em>不能放前端</em></h2>
+  <pre>訪客瀏覽器 ──POST /fill──> Cloudflare Worker(GROQ_API_KEY 藏在這)──> Groq API
+  GitHub Pages                順便做:每日額度、失敗退款、結果驗收</pre>
+  <p class="code-note">跟前課模組 6 同一個理由:key 放前端等於把信用卡貼在店門口。差別:這次 Worker 不只代打電話,還驗證輸入、扣額度、驗收輸出 — 一個 Worker,多個職責。</p>
+</section>
+
+<section class="slide">
+  <h2>跟 AI <em>約好只回 JSON</em></h2>
+  <pre>const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${env.GROQ_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "openai/gpt-oss-120b",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" }, // 跟 AI 約好:只准回 JSON
+    max_tokens: 600,
+    temperature: 0.8,
+  }),
+});</pre>
+  <p class="code-note">response_format: json_object 是 OpenAI 相容 API 的標準參數,強制模型只輸出 JSON。</p>
+</section>
+
+<section class="slide">
+  <h2>仍要<em>防禦性解析</em></h2>
+  <pre>export function parseJSONLoose(text) {
+  const s = String(text ?? "");
+  try { return JSON.parse(s); } catch { /* 繼續 */ }
+  const m = s.match(/```json\s*([\s\S]*?)```/i) || s.match(/```\s*([\s\S]*?)```/);
+  if (m) {
+    try { return JSON.parse(m[1]); } catch { /* 落空 */ }
+  }
+  return null;
+}</pre>
+  <p class="code-note">模型偶爾會把 JSON 包進 ```json 程式碼框 — 先直接 parse,失敗再去框裡撈一次。</p>
+</section>
+
+<section class="slide">
+  <h2>補格 prompt <em>全文</em></h2>
+  <pre>你是目標設定教練,使用「九宮格目標法」(源自原田メソッド,
+即大谷翔平用過的目標達成表的方法)。
+使用者的 3×3 九宮格:中央(位置4)是核心目標,周圍 8 格(位置0-3、5-8)是子目標。
+${核心目標;留空時改為:請先推斷一個具體可衡量的核心目標}
+已填的格子:
+${每個已填格一行:位置i:「文字」;全空時寫(其餘全空)}
+請補滿所有空格。規則:
+1. 子目標要具體、彼此不重複、共同支撐核心目標;涵蓋「心・技・體・生活」四面向。
+2. 每格 2-8 個字,繁體中文(台灣用語),不用標點結尾,不用 emoji。
+3. 已填的格子原樣保留,一字不改。
+只輸出 JSON:{"cells":["位置0文字",...,"位置8文字"]},長度必為 9。</pre>
+  <p class="code-note">原始碼:worker-deploy/src/lib/prompts.js 的 corePrompt(cells)。</p>
+</section>
+
+<section class="slide">
+  <h2>prompt <em>逐段拆解</em></h2>
+  <ul class="points">
+    <li><strong>角色與方法論</strong> — 寫進原田メソッド,子目標才會支撐核心目標而非八個願望</li>
+    <li><strong>格局說明</strong> — 模型看不到九宮格,位置對應要講到死(中央 = 位置 4)</li>
+    <li><strong>動態組裝</strong> — 連核心目標留空都不報錯:請 AI 先推斷一個</li>
+    <li><strong>規則 1 品質</strong> — 四面向防「八格全是努力練習」的同義反覆</li>
+    <li><strong>規則 2 版面</strong> — 每格 2-8 字:字數是版面問題,在 prompt 層先控制</li>
+    <li><strong>規則 3 + 末行是合約</strong> — 程式端對每一條都有對應驗收</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>Worker 端:<em>先扣後跑</em>、失敗退款、驗收輸出</h2>
+  <pre>// 先扣後跑:額度先 -1 再呼叫 AI(防同時送兩發繞過上限)
+const quota = await takeQuota(env.DB, { kind: "fill", ip, limit: 12, day });
+if (!quota.ok) return json({ error: "quota_exceeded", resetAt: taipeiResetAt() }, 429, cors);
+
+let out = null;
+try { out = await chatJSON(env, prompt, 600); } catch { out = null; }
+
+// 驗收:必須是長度 9 的字串陣列,否則退款 + llm_failed
+const arr = Array.isArray(out?.cells) ? out.cells : null;
+if (!arr || arr.length !== 9 || arr.some((x) => typeof x !== "string" || !x.trim())) {
+  await refundQuota(env.DB, { kind: "fill", ip, day });  // 確定失敗 → 退還額度
+  return json({ error: "llm_failed" }, 502, cors);
+}
+const cells = arr.map((x) => x.trim());
+normCells.forEach((c, i) => { if (c) cells[i] = c; });  // 已填格被 AI 改了?原值蓋回去</pre>
+</section>
+
+<section class="slide">
+  <h2>三件事值得<em>停下來看</em></h2>
+  <ul class="points">
+    <li><strong>先扣後跑</strong> — 先跑再扣的話,十發同時送全過,上限形同虛設</li>
+    <li><strong>失敗退款</strong> — AI 掛了不是使用者的錯;先扣防濫用、退款對人公平,不衝突</li>
+    <li><strong>雙保險</strong> — prompt 是請求,程式是保證:使用者的字不能靠 AI 的自覺來保護</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>模型選型:一個<em>真實的雷</em></h2>
+  <ul class="points">
+    <li>llama-3.3-70b 聊天沒事,在 Groq 上跑<strong>結構化輸出</strong>(tool-call、嚴格 JSON)常被退單</li>
+    <li>換 <strong>openai/gpt-oss-120b</strong> 就穩了</li>
+    <li>「會聊天」和「會交格式正確的資料」是<strong>兩種能力</strong></li>
+    <li>換模型成本 = 一個字串 — 照你的場景測,不要照排行榜</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>key 貼進前端就上線</strong> — 練習版只能自己玩;給別人用,key 必須進 Worker Secret</li>
+    <li><strong>相信 AI 會乖乖回 JSON</strong> — parseJSONLoose + 長度驗證兩層不能省</li>
+    <li><strong>AI「好心」改使用者的字</strong> — 程式端原值蓋回去那行才是真正的保護</li>
+    <li><strong>失敗也扣額度</strong> — 口訣:先扣後跑、確定失敗就退</li>
+    <li><strong>拿聊天模型做結構化輸出</strong> — 換場景要重測模型</li>
+    <li><strong>prompt 沒寫字數限制</strong> — 一格三十個字,桌布版面直接爆炸</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li><strong>null 是授權</strong>:AI 只填空格;原值由程式再蓋一次,雙保險</li>
+    <li>response_format + parseJSONLoose + 長度驗收,<strong>三層缺一不可</strong></li>
+    <li><strong>先扣後跑、確定失敗就退</strong> — 防濫用與對人公平可以並存</li>
+    <li>對照:demos/02-ai-fill(BYO key 直連)→ app/(Worker + Secret + 額度)</li>
+  </ul>
+  <span class="demo-tag">下一章 04 — 圖片上傳與前端縮圖:FileReader / canvas / base64</span>
+</section>
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo 01:九宮格 UI — 目標九宮格課程</title>
+<meta name="description" content="課程第 02 章成果:用 CSS Grid 畫出 3×3 九宮格,內容即打即存 localStorage。">
+<style>
+  /* ============ 夜空製圖室主題(課程統一視覺) ============ */
+  :root {
+    --bg: #0e1420;            /* 深夜藍底 */
+    --gold: #c9a44e;          /* 金色主強調 */
+    --gold-bright: #e7c87e;
+    --line-gold: rgba(201, 164, 78, 0.28);
+    --line-cool: rgba(140, 156, 184, 0.16);
+    --ink: #e9e6da;           /* 主文字色 */
+    --muted: #76819a;         /* 次要文字色 */
+    --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 600px at 75% -10%, rgba(56, 80, 130, 0.30), transparent 60%),
+      radial-gradient(700px 500px at 5% 110%, rgba(201, 164, 78, 0.07), transparent 60%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 60px; }
+
+  .kicker {
+    font-size: 12px; letter-spacing: 0.22em;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.7rem, 6vw, 2.4rem);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .lead { color: var(--muted); margin-bottom: 28px; }
+
+  /* ============ 3×3 九宮格:CSS Grid 一行搞定 ============ */
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);  /* 三等分欄,本章主角 */
+    gap: 10px;
+  }
+  .cell {
+    position: relative;
+    border: 1px solid var(--line-cool);
+    border-radius: 12px;
+    background: rgba(8, 12, 20, 0.62);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .cell:focus-within {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 164, 78, 0.14);
+  }
+  /* 中央格(index 4)= 核心目標,用金邊與內光強調 */
+  .cell-core {
+    border-color: var(--line-gold);
+    box-shadow: inset 0 0 26px rgba(201, 164, 78, 0.08);
+  }
+  .cell-core:focus-within {
+    border-color: var(--gold-bright);
+    box-shadow: inset 0 0 26px rgba(201, 164, 78, 0.10), 0 0 0 3px rgba(201, 164, 78, 0.18);
+  }
+  .cell-core textarea { font-weight: 700; }
+  .cell-tag {
+    position: absolute; top: 7px; left: 0; right: 0;
+    text-align: center;
+    font-size: 10px; letter-spacing: 0.28em; text-indent: 0.28em;
+    color: var(--gold);
+    pointer-events: none;   /* 標籤不擋點擊,點到就聚焦 textarea */
+  }
+  .cell textarea {
+    display: block; width: 100%;
+    min-height: 96px;
+    background: transparent; border: 0; outline: none; resize: none;
+    color: var(--ink);
+    font-family: var(--sans); font-size: 14px; line-height: 1.55;
+    text-align: center;
+    padding: 1.45rem 0.5rem 0.6rem;
+  }
+  .cell textarea::placeholder { color: var(--muted); opacity: 0.75; }
+
+  /* ============ 工具列與頁尾 ============ */
+  .toolbar {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 22px;
+  }
+  button {
+    font-family: var(--sans); font-size: 13.5px;
+    color: var(--gold-bright);
+    background: rgba(201, 164, 78, 0.08);
+    border: 1px solid var(--line-gold);
+    border-radius: 999px;
+    padding: 0.55rem 1.4rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  button:hover { background: rgba(201, 164, 78, 0.16); border-color: var(--gold); }
+  .saved-hint {
+    font-size: 12.5px; letter-spacing: 0.1em;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .saved-hint.show { opacity: 1; }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-cool);
+    font-size: 12.5px; color: var(--muted);
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { color: var(--gold-bright); text-decoration: underline; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <p class="kicker">目標九宮格課程 · DEMO 01(對應第 02 章)</p>
+    <h1>畫出九宮格</h1>
+    <p class="lead">
+      中央寫核心目標,周圍 8 格寫支撐它的子目標。
+      內容即打即存(localStorage),關掉頁面再打開也不會不見。
+      留空的格子,下一章會交給 AI 補。
+    </p>
+  </header>
+
+  <!-- 格子由 JS 動態建立:9 格一個迴圈,比手寫 9 段 HTML 好維護 -->
+  <section class="grid3" id="grid" aria-label="目標九宮格"></section>
+
+  <div class="toolbar">
+    <button type="button" id="clearBtn">清空九宮格</button>
+    <span class="saved-hint" id="savedHint">已儲存</span>
+  </div>
+
+  <footer>
+    <p>完整版:<a href="../../app/">../../app/</a>(五步精靈 + AI 補格 + 桌布生成)</p>
+    <p>方法源自原田隆史「原田メソッド」;大谷翔平高中時期的目標達成表是最著名的案例。</p>
+  </footer>
+</main>
+
+<script>
+// ============ 資料模型 ============
+// 九宮格 = 長度 9 的字串陣列,索引 0-8 由左到右、由上到下,index 4 = 中央核心目標。
+// 「留空 = 之後交給 AI」這個約定,從本章就開始建立。
+const STORAGE_KEY = 'goal-grid-demo-01';
+const CORE_INDEX = 4;
+
+// ============ 讀取:localStorage → 陣列 ============
+// localStorage 只能存字串,所以進出都要 JSON 轉換;
+// 資料可能被改壞(手動編輯、舊版本),所以 try/catch + 形狀檢查。
+function loadCells() {
+  try {
+    const cells = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (Array.isArray(cells) && cells.length === 9) {
+      return cells.map((c) => (typeof c === 'string' ? c : ''));
+    }
+  } catch (err) {
+    console.warn('儲存的資料壞掉了,回到空白九宮格', err);
+  }
+  return Array(9).fill('');
+}
+
+// ============ 儲存:陣列 → localStorage ============
+function saveCells(cells) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cells));
+  showSavedHint();
+}
+
+// 「已儲存」提示:閃一下就淡出,讓使用者知道不用按任何儲存鍵
+let hintTimer = null;
+function showSavedHint() {
+  const hint = document.getElementById('savedHint');
+  hint.classList.add('show');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => hint.classList.remove('show'), 1200);
+}
+
+// ============ 建立九宮格 UI ============
+// 每格一個 <textarea>,dataset.idx 記住自己是第幾格 —— 之後讀回時就靠它對位。
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  const cells = loadCells();
+
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.className = i === CORE_INDEX ? 'cell cell-core' : 'cell';
+
+    if (i === CORE_INDEX) {
+      const tag = document.createElement('span');
+      tag.className = 'cell-tag';
+      tag.textContent = '核心目標';
+      cell.appendChild(tag);
+    }
+
+    const box = document.createElement('textarea');
+    box.dataset.idx = String(i);
+    box.name = `cell-${i}`;
+    box.rows = 2;
+    box.placeholder = i === CORE_INDEX ? '寫下核心目標' : '子目標,可留空';
+    box.setAttribute('aria-label', i === CORE_INDEX ? '核心目標' : `子目標(位置 ${i})`);
+    box.value = cells[i];
+
+    // 即打即存:每次輸入就把 9 格全部收一遍再存,簡單到不會出錯
+    box.addEventListener('input', () => {
+      cells[i] = box.value;
+      saveCells(cells);
+    });
+
+    cell.appendChild(box);
+    grid.appendChild(cell);
+  }
+}
+
+// ============ 清空 ============
+function clearGrid() {
+  if (!confirm('確定要清空整張九宮格?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  for (const box of document.querySelectorAll('#grid textarea')) {
+    box.value = '';
+  }
+  showSavedHint();
+}
+
+buildGrid();
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+</script>
+</body>
+</html>

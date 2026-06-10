@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Cpath d=%27M6 3h1v10H6zM9 3h1v10H9zM3 6h10v1H3zM3 9h10v1H3z%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 02 章 九宮格 UI 與資料模型 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+/* 夜空製圖室 主題覆寫(沿用 deck.css 類別體系,僅換色) */
+:root{
+  --ink:#0e1420; --pine:#16243c; --moss:#1d2f4e; --mist:#8fa1bd;
+  --cream:#e9edf5; --paper:#dce3ef; --copper:#c9a44e; --copper-d:#a8893f;
+}
+.bar{color:rgba(143,161,189,.7)}
+.bar a{color:rgba(201,164,78,.85)}
+.slide{background:
+  radial-gradient(120% 90% at 85% -15%, rgba(143,161,189,.12), transparent 55%),
+  radial-gradient(90% 70% at 0% 115%, rgba(201,164,78,.09), transparent 50%),
+  var(--ink)}
+ul.points li{border-bottom-color:rgba(143,161,189,.16)}
+pre{background:rgba(10,15,26,.72); border-color:rgba(143,161,189,.25); border-left-color:var(--copper)}
+th,td{border-bottom-color:rgba(143,161,189,.2)}
+.demo-tag{border-color:rgba(201,164,78,.5)}
+.progress{background:rgba(143,161,189,.12)}
+.navhint{color:rgba(143,161,189,.45)}
+</style>
+</head>
+<body>
+<header class="bar"><span>AI 互動行銷頁實戰 — 目標九宮格 — 第 02 章</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI GOAL GRID COURSE — 第 02 章</p>
+  <h1>九宮格 UI 與<em>資料模型</em></h1>
+  <p class="sub">3×3 填寫頁 + 「null = 留給 AI」的約定 + localStorage 即時保存。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">第一課不是怎麼畫九宮格</p>
+  <p class="big">畫面是畫面,<em>資料是資料</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>核心觀念:<em>資料才是本體</em></h2>
+  <ul class="points">
+    <li>畫面:九個 textarea;資料:<strong>長度 9 的陣列</strong>,備份在 localStorage</li>
+    <li>畫面隨時可以砍掉重畫,資料才是本體</li>
+    <li>之後每一章(AI 補格、81 格、桌布)都是<strong>對陣列做事</strong>,不是對畫面做事</li>
+    <li>最重要的約定:<strong>null = 「這格留給 AI」的明確指令</strong>;{text, source} = 使用者的</li>
+    <li>「尊重使用者輸入」這個產品承諾,直接寫進資料結構</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>步驟 1:CSS Grid 排出 <em>3×3</em></h2>
+  <pre>.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cell {
+  border: 1px solid #2c3a52;
+  border-radius: 12px;
+  background: rgba(8, 12, 20, 0.62);
+}
+.cell-core { border-color: #c9a44e; }   /* 中央格用金色強調 */</pre>
+  <p class="code-note">repeat(3, 1fr) = 三欄、每欄等寬。3×3 天生窄螢幕友善,手機上不用寫任何 media query;HTML 端只需要一個空容器 &lt;div id="grid3"&gt;。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟 2:資料模型 — <em>null = 留給 AI</em></h2>
+  <pre>const STATE_KEY = 'goal-grid-state-v1';
+
+function defaultState() {
+  return {
+    version: 1,
+    // 長度 9 的陣列,index 4 = 中央核心目標
+    // 每格:null(留給 AI)或 {text, source:'user'|'ai'}
+    cells: Array(9).fill(null),
+    updatedAt: new Date().toISOString(),
+  };
+}</pre>
+  <p class="code-note">兩個設計眼:version:1 讓未來改格式時認得出舊資料;九格由左到右、由上到下編號 0–8,正中央剛好是 4。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟 3:讀寫 localStorage — <em>setCell 是唯一寫入口</em></h2>
+  <pre>function loadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (raw &amp;&amp; raw.version === 1 &amp;&amp; Array.isArray(raw.cells)) return raw;
+  } catch { /* 資料壞了就當沒存過 */ }
+  return defaultState();
+}
+
+function setCell(state, idx, text, source = 'user') {
+  const t = String(text ?? '').trim();
+  state.cells[idx] = t ? { text: t, source } : null;  // 清空 = 還給 AI
+  state.updatedAt = new Date().toISOString();
+  saveState(state);
+}</pre>
+  <p class="code-note">trim 後是空字串就寫回 null —「把字刪光」等於「這格還給 AI」。所有寫入走同一個函式,存檔就不會漏。</p>
+</section>
+
+<section class="slide">
+  <h2>步驟 4:<em>dataset.idx</em> 對位</h2>
+  <pre>for (let i = 0; i &lt; 9; i++) {
+  const cell = document.createElement('div');
+  cell.className = i === 4 ? 'cell cell-core' : 'cell';
+  const ta = document.createElement('textarea');
+  ta.dataset.idx = String(i);            // 畫面第 i 格 ←→ state.cells[i]
+  ta.placeholder = i === 4 ? '我的核心目標' : '留給 AI';
+  ta.value = state.cells[i] ? state.cells[i].text : '';
+  ta.addEventListener('input', () => {
+    setCell(state, Number(ta.dataset.idx), ta.value);  // 即打即存
+  });
+  cell.appendChild(ta); grid.appendChild(cell);
+}</pre>
+  <p class="code-note">別用 DOM 順序猜對應 — 版面一改就全錯位;dataset.idx 不動如山。placeholder「留給 AI」:空格是合法狀態,UI 文案跟資料模型講同一種語言。</p>
+</section>
+
+<section class="slide">
+  <h2>驗收清單</h2>
+  <ul class="points">
+    <li>填三格(含中央),重新整理 → <strong>內容都在</strong></li>
+    <li>把某格的字全刪,重新整理 → 該格回到 placeholder「留給 AI」</li>
+    <li>F12 → Application → Local Storage → goal-grid-state-v1,手填格 source 是 <strong>"user"</strong></li>
+    <li>視窗縮到手機寬度 → 3×3 不破版、無橫向捲軸</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>給 AI 的 <em>prompt 範本</em>(濃縮版)</h2>
+  <pre>做一個單檔 HTML 的「目標九宮格」填寫頁(CSS/JS 內嵌):
+【版面】3×3 CSS Grid(repeat(3,1fr)、gap 10px);每格一個 textarea;
+中央格「核心目標」金色強調,其餘八格是子目標
+【資料模型】長度 9 的陣列 cells,index 4 = 核心目標;null = 留給 AI,
+有字存 {text, source:'user'}(結構先留好給之後的 AI)
+【儲存】輸入即存 localStorage(key 'goal-grid-state-v1',含 version:1);
+載入時讀回;解析失敗或版本不對就用全新狀態,不准報錯
+【對位】textarea 用 dataset.idx 寫回陣列;清空(trim 後為空)寫回 null
+【風格】深夜藍底 #0e1420、金色 #c9a44e,繁體中文,手機優先
+【驗收】填三格重整不丟 / 刪光回 placeholder / source 是 "user" / 375px 不破版</pre>
+  <p class="code-note">完整版在 course/02-grid-ui.md — 整段可直接貼給 ChatGPT / Claude 重現本章成品。</p>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>dataset 永遠是字串</strong> — "4" 不是 4,當索引要先 Number()</li>
+    <li><strong>把字串直接存進陣列</strong> — 丟掉 source,「一字不改」就落實不了</li>
+    <li><strong>JSON.parse 沒包 try/catch</strong> — 壞資料一進來,整頁 JS 停擺</li>
+    <li><strong>清空沒歸 null</strong> — 存了 {text:""},AI 以為格子被佔用而跳過</li>
+    <li><strong>用 innerHTML 塞使用者輸入</strong> — 注入風險,一律 value / textContent</li>
+    <li><strong>忘了中央格特殊性</strong> — 跑八個子目標的迴圈要跳過 index 4</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>對照成品</h2>
+  <ul class="points">
+    <li><strong>demos/01-grid-ui/index.html</strong> — 本章成品,單檔、雙擊能開</li>
+    <li>完整版同一套邏輯:app/js/state.js + app/js/grid.js — 骨架一模一樣,只是格子變多</li>
+    <li>線上版步驟二 = 本章 UI 加上完整視覺</li>
+  </ul>
+  <span class="demo-tag">yazelin.github.io/ai-goal-grid-course/app/</span>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li><strong>資料是本體</strong>:長度 9 陣列、index 4 = 核心、null = 留給 AI、source 記主權</li>
+    <li><strong>setCell 唯一寫入口</strong>、dataset.idx 對位、try/catch 防壞資料</li>
+    <li>空格不是未完成,是一種合法狀態 — 文案與資料模型講同一種語言</li>
+  </ul>
+  <span class="demo-tag">下一章 03 — AI 補格:把 null 的格子交給 AI,一字不改是鐵律</span>
+</section>
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

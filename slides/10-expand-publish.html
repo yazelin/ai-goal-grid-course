@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 10 章 進階 9×9 與發佈 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 10 章 — 進階 9×9 與發佈</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 · 第 10 章</p>
+  <h1>進階 9×9 與發佈:<br>展開 81 格,讓全世界(和 <em>AI</em>)看見</h1>
+  <p class="sub">AI 序列展開 64 個行動、9×9 桌布版型;然後用 publish.sh + llms.txt + JSON-LD,把課程發佈成搜尋引擎和 AI 都讀得懂的站。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">64 個空格瞪著你 ——<br>AI 把勸退門檻變成<em>一鍵</em>。</p>
+  <p class="sub">大谷那張表看過的人成千上萬,真正填完 81 格的極少。AI 不是替你想得更好,是生出一版夠好的草稿,你只負責改與刪 — 改一個字的門檻,遠低於想一個詞。</p>
+</section>
+
+<section class="slide">
+  <h2>資料模型:actions 是 8×8</h2>
+  <pre>// localStorage 'goal-grid-state-v1'
+state.cells   = Array(9);  // null | {text, source:'user'|'ai'}
+                           // index 4 = 核心目標
+state.actions = Array(8);  // null | Array(8) of (null | {text, source})
+                           // actions[i] = 子目標 i 的八個行動</pre>
+  <p class="code-note">「null = 留給 AI、有物件 = 使用者鎖定」的同一套模型,從 3×3 直接沿用到 64 格。展開走第 03 章建好的 /fill 端點的第二種模式(mode:'expand'):送核心目標 + 子目標 + 已填行動,拿回八個行動 — prompt 拿大谷當示範:「運」底下寫「撿垃圾」「打招呼」這種可每日檢核的小事。</p>
+</section>
+
+<section class="slide">
+  <h2>序列展開:八次呼叫,一個迴圈</h2>
+  <pre>// app/js/main.js — runExpand(節錄)
+const coreGoal = state.cells[4].text;
+for (let s = 0; s &lt; 8; s++) {
+  aiProgressEl.textContent = `展開中 ${s + 1}/8`;
+  const existing = (state.actions[s] || Array(8).fill(null))
+    .map((a) =&gt; (a ? a.text : null));
+  if (existing.every(Boolean)) continue;   // 這列已滿,不重抽
+  const subGoal = state.cells[posOfSubIndex(s)].text;
+  const actions = await api.expandSub(coreGoal, subGoal, existing);
+  actions.forEach((text, j) =&gt; {
+    if (!existing[j]) setAction(state, s, j, text, 'ai');
+  });
+  persist();                               // 每完成一列就存檔
+}</pre>
+</section>
+
+<section class="slide">
+  <h2>為什麼序列,不用 Promise.all</h2>
+  <ul class="points">
+    <li><strong>進度感</strong> — 「展開中 3/8」讓使用者知道沒當機;八個並發只能給一顆轉圈圈</li>
+    <li><strong>失敗只損一列</strong> — 前四列已各自 persist;再按一次從斷點續跑,不重抽、不重複扣配額</li>
+    <li><strong>對上游友善</strong> — 八個請求同時打,容易撞 LLM 速率限制,整批失敗</li>
+    <li><strong>前提守門</strong> — 3×3 先填滿才能展開:每列都要「核心目標 + 子目標」當脈絡,程式擋 + 文案引導</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>9×9 桌布:主體與全圖分離</h2>
+  <ul class="points">
+    <li>81 格直接鋪滿手機桌布,每格字只剩幾個像素 — <strong>不可讀的桌布沒人會設</strong></li>
+    <li>中央 3×3 放大當<strong>視覺主角</strong>;81 全圖縮小放下方(直式)或右側(橫式)</li>
+    <li>沿用大谷表轉載圖的色彩慣例:八個子目標各一色,81 全圖的外圍區塊中心格同色呼應</li>
+    <li>文字交給第 06 章的 fitText(二分搜尋字級 + CJK 逐字斷行),字長差異再大也不爆框</li>
+  </ul>
+  <p class="sub">直式:3×3 中心 0.30H、全圖寬 0.92W 中心 0.74H;橫式:3×3 置左 0.27W、全圖置右 0.5W。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">發佈</p>
+  <p class="big">dev 私有 repo 是<em>工作檯</em>,<br>公開 repo 是<em>櫥窗</em>。</p>
+  <p class="sub">做完的東西沒被看見等於沒做。設計文件、驗證截圖、Worker 原始碼、管理 token 全留在工作檯;一支 publish.sh 只把櫥窗該有的東西搬出去。工作檯可以亂,櫥窗永遠乾淨。</p>
+</section>
+
+<section class="slide">
+  <h2>publish.sh:三十行搬運工</h2>
+  <pre># scripts/publish.sh(節錄)
+set -euo pipefail
+PUB_REPO="https://github.com/yazelin/ai-goal-grid-course.git"
+PUBLISH_PATHS=(index.html .nojekyll slides demos course app \
+               assets sitemap.xml llms.txt robots.txt)
+git clone -q --depth 1 "$PUB_REPO" "$TMP/pub"
+# 清空(留 .git)後重放發佈集
+find "$TMP/pub" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+for p in "${PUBLISH_PATHS[@]}"; do [ -e "$p" ] &amp;&amp; cp -r "$p" "$TMP/pub/"; done
+rm -rf "$TMP/pub/app/test"               # 開發資產不發佈
+cp README-public.md "$TMP/pub/README.md"
+git add -A
+git diff --cached --quiet &amp;&amp; echo "publish: 沒有變更,跳過" \
+  || { git commit -q -m "publish: 教材更新"; git push -q origin main; }</pre>
+</section>
+
+<section class="slide">
+  <h2>三個設計決定</h2>
+  <ul class="points">
+    <li><strong>白名單,不是黑名單</strong> — 列出「要公開什麼」;黑名單總有一天漏掉新增的私有資料夾,白名單預設安全</li>
+    <li><strong>清空重放</strong> — dev 改名或刪除的檔案同步消失,公開站不留殭屍頁</li>
+    <li><strong>可重複執行</strong> — 沒變更就跳過 commit,跑十次和跑一次結果相同</li>
+    <li>README 也是發佈品:dev 的寫給自己,README-public.md 寫給訪客</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>AEO:讓 AI 搜尋引擎讀懂你的課</h2>
+  <ul class="points">
+    <li>越來越多人問 ChatGPT / Perplexity 而不是 Google — 你的課要讓 <strong>AI 講得出來</strong></li>
+    <li><strong>llms.txt</strong> — 專門寫給 LLM 的純文字說明書:一句話定位 + 重要連結攤開</li>
+    <li><strong>sitemap.xml</strong> — 列所有公開頁,提交 Google Search Console</li>
+    <li><strong>JSON-LD(Course schema)</strong> — 首頁 head 裡給機器讀的身分證</li>
+    <li>admin.html / tracker.html 加 <strong>noindex</strong>;關鍵資訊用文字寫在頁面上,不藏在圖裡</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>JSON-LD:機器讀的身分證</h2>
+  <pre>&lt;script type="application/ld+json"&gt;
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "AI 互動行銷頁實戰 — 目標九宮格",
+  "description": "教行銷人員把 AI 行銷頁零件組成完整產品的實戰課程。",
+  "provider": { "@type": "Person", "name": "Yaze Lin",
+                "url": "https://yazelin.github.io/" },
+  "isAccessibleForFree": true,
+  "inLanguage": "zh-Hant"
+}
+&lt;/script&gt;</pre>
+  <p class="code-note">鐵則:schema 寫的必須是頁面上真的有的東西 — 亂填會被搜尋引擎降權。</p>
+</section>
+
+<section class="slide">
+  <h2>兩個容易踩的發佈坑</h2>
+  <ul class="points">
+    <li><strong>子路徑陷阱</strong> — GitHub Pages 專案頁的 robots.txt / llms.txt 在子路徑,爬蟲實際讀的是<strong>網域根</strong>;真正站根檔案由 yazelin.github.io 主 repo 管理,本課 robots.txt 開頭誠實註明 <span class="dim">(AEO 檢測分數低,先確認工具掃的是哪個 URL — 前課實測過)</span></li>
+    <li><strong>OG 圖鐵則</strong> — 1200×630、壓 200KB 內;og:image 必須是<strong>完整 https 網址</strong>,相對路徑抓不到,分享變破圖卡</li>
+    <li>圖不含文字:中文字交給 og:title 顯示,不讓 AI 畫;改圖後用 FB Sharing Debugger 強制重抓快取</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>驗收</h2>
+  <ul class="points">
+    <li>展開進度 1/8 → 8/8;中途斷網再按一次,從斷掉那列<strong>續跑</strong>,已展開的列不重抽</li>
+    <li>9×9 直式是「上 3×3、下全圖」;手機鎖定畫面上中央九格清晰可讀</li>
+    <li>publish.sh 跑兩次:第一次推送,第二次「沒有變更,跳過」</li>
+    <li>公開 repo 裡沒有 docs/、scripts/、worker-deploy/、app/test</li>
+    <li>把課程網址貼給 ChatGPT 問「這在講什麼」— 答得出來,AEO 就生效了;再貼到 LINE 看 OG 預覽卡</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧 — 也是全課最後一章</h2>
+  <ul class="points">
+    <li>81 格:序列展開 + 逐列存檔 + 已滿跳過 = <strong>斷點續跑</strong></li>
+    <li>桌布版型:情感主體(3×3 放大)與完整資訊(81 全圖)分離</li>
+    <li>發佈:白名單 + 清空重放 + 可重複執行的 publish.sh</li>
+    <li>AEO:llms.txt、sitemap、JSON-LD、noindex — 讓 Google 和 AI 都讀得懂你</li>
+    <li>接下來:照課程<strong>自部署一套</strong>,燒你自己的額度,把它變成你自己的產品</li>
+  </ul>
+  <span class="demo-tag">課程完結 — 成品:yazelin.github.io/ai-goal-grid-course/app/</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

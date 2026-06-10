@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>30 天行動追蹤模板 — 目標九宮格</title>
+<meta name="description" content="目標九宮格的 30 天行動追蹤模板:八個子目標 × 三十天勾選格,可直接列印成 A4 紙本。">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230e1420'/%3E%3Crect x='6.5' y='6.5' width='3' height='3' rx='.8' fill='%23c9a44e'/%3E%3C/svg%3E">
+<style>
+  /* 夜空製圖室(螢幕)/ 白底黑字(列印)雙模式 */
+  :root {
+    --bg: #0e1420;
+    --panel: rgba(20, 28, 44, 0.55);
+    --line-cool: rgba(140, 156, 184, 0.16);
+    --line-gold: rgba(201, 164, 78, 0.28);
+    --gold: #c9a44e;
+    --gold-bright: #e7c87e;
+    --ink: #e9e6da;
+    --ink-dim: #aab3c5;
+    --muted: #76819a;
+    --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.75;
+    color: var(--ink);
+    background:
+      radial-gradient(1100px 700px at 72% -8%, rgba(56, 80, 130, 0.32), transparent 62%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 36px 20px 56px;
+  }
+  .sheet { max-width: 1080px; margin: 0 auto; }
+
+  .kicker { font-size: 11.5px; letter-spacing: 0.30em; color: var(--gold); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-size: clamp(1.5rem, 4vw, 2.1rem); font-weight: 700; letter-spacing: 0.05em; }
+  .goal-line { margin-top: 10px; font-size: 15px; color: var(--ink-dim); }
+  .goal-line strong { font-family: var(--serif); color: var(--gold-bright); letter-spacing: 0.03em; }
+  .goal-line .blank { display: inline-block; min-width: 14em; border-bottom: 1px solid var(--muted); }
+  .howto { margin-top: 14px; font-size: 13.5px; color: var(--ink-dim); max-width: 46em; }
+  .meta { margin-top: 10px; font-size: 13.5px; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 24px; }
+  .meta .blank { display: inline-block; min-width: 9em; border-bottom: 1px solid var(--muted); }
+
+  .toolbar { margin: 18px 0 6px; display: flex; gap: 12px; align-items: center; }
+  .btn-print {
+    font-family: var(--sans); font-size: 14px; font-weight: 700;
+    color: #1a1408;
+    background: linear-gradient(135deg, #dcb766, #b8923f);
+    border: 1px solid rgba(231, 200, 126, 0.55); border-radius: 999px;
+    padding: 0.62rem 1.5rem;
+    cursor: pointer;
+  }
+  .toolbar .note { font-size: 12.5px; color: var(--muted); }
+
+  .table-scroll { overflow-x: auto; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { border: 1px solid var(--line-cool); text-align: center; }
+  thead th {
+    font-size: 10.5px; font-weight: 500; color: var(--muted);
+    padding: 4px 0; min-width: 22px;
+  }
+  thead th.h-sub {
+    font-size: 11.5px; letter-spacing: 0.22em; color: var(--gold);
+    text-align: left; padding: 4px 10px;
+  }
+  tbody th {
+    font-size: 12.5px; font-weight: 500; line-height: 1.45;
+    color: var(--ink); text-align: left;
+    padding: 7px 10px; width: 170px; max-width: 170px;
+    border-left: 3px solid var(--line-gold);
+    background: var(--panel);
+  }
+  tbody th .blank { display: block; border-bottom: 1px solid var(--muted); height: 1.3em; }
+  td.check { height: 34px; }
+
+  footer { margin-top: 26px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+  footer .brand { font-family: var(--serif); color: var(--gold); letter-spacing: 0.12em; }
+
+  /* ---- 列印:A4 橫式、白底黑字、收掉工具列 ---- */
+  @media print {
+    @page { size: A4 landscape; margin: 10mm 12mm; }
+    body { background: #fff; color: #111; padding: 0; font-size: 12px; }
+    .sheet { max-width: none; }
+    .kicker { color: #8a6c2c; }
+    h1 { color: #111; }
+    .goal-line, .howto, .meta { color: #333; }
+    .goal-line strong { color: #111; }
+    .goal-line .blank, .meta .blank, tbody th .blank { border-bottom-color: #888; }
+    .toolbar { display: none; }
+    .table-scroll { overflow: visible; margin-top: 8px; }
+    table { min-width: 0; page-break-inside: avoid; }
+    th, td { border-color: #999; }
+    thead th { color: #444; }
+    thead th.h-sub { color: #444; }
+    tbody th { color: #111; background: #f3f0e8; border-left-color: #b8923f; width: 150px; max-width: 150px; padding: 5px 8px; }
+    td.check { height: 8mm; min-width: 6.5mm; }
+    footer { color: #777; margin-top: 12px; }
+    footer .brand { color: #8a6c2c; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <p class="kicker">目標九宮格 · GOAL GRID</p>
+  <h1>30 天行動追蹤</h1>
+  <p class="goal-line">核心目標:<strong id="core-goal"><span class="blank"></span></strong></p>
+  <p class="howto">每一列是你的一個子目標。每天結束前,回頭看一眼:今天有沒有為它做一件事?有,就在當天的格子打勾。三十天後,這張表會誠實告訴你,力氣花在哪裡。</p>
+  <p class="meta"><span>起始日:<span class="blank"></span></span><span>姓名:<span class="blank"></span></span></p>
+
+  <div class="toolbar">
+    <button class="btn-print" type="button" onclick="window.print()">列印這張表(A4)</button>
+    <p class="note">列印會自動轉成白底黑字的橫式 A4;子目標取自你存在這台瀏覽器裡的九宮格,空欄可以手寫。</p>
+  </div>
+
+  <div class="table-scroll">
+    <table aria-label="30 天行動追蹤表:八個子目標乘三十天">
+      <thead>
+        <tr id="head-row">
+          <th class="h-sub" scope="col">子目標 \ 天</th>
+        </tr>
+      </thead>
+      <tbody id="body-rows"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p><span class="brand">目標九宮格 GOAL GRID</span> · yazelin.github.io/ai-goal-grid-course</p>
+    <p>方法源自原田隆史的「原田メソッド」(Open Window 64)。「マンダラチャート」は一般社団法人マンダラチャート協会の登録商標です。</p>
+  </footer>
+</div>
+
+<script>
+// 從 localStorage 帶入八個子目標(與 app 同源才讀得到;沒有 state 就給空白欄位手寫)
+const STATE_KEY = 'goal-grid-state-v1';
+const DAYS = 30;
+const SUB_POSITIONS = [0, 1, 2, 3, 5, 6, 7, 8]; // 3×3 位置(略過中央 4 = 核心目標)
+
+function readState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (raw && raw.version === 1 && Array.isArray(raw.cells)) return raw;
+  } catch { /* 壞資料當沒有 */ }
+  return null;
+}
+
+const state = readState();
+const cellText = (pos) => {
+  const c = state && state.cells[pos];
+  return c && typeof c.text === 'string' && c.text.trim() ? c.text.trim() : '';
+};
+
+const coreEl = document.getElementById('core-goal');
+const core = cellText(4);
+if (core) coreEl.textContent = core;
+
+const headRow = document.getElementById('head-row');
+for (let d = 1; d <= DAYS; d++) {
+  const th = document.createElement('th');
+  th.scope = 'col';
+  th.textContent = String(d);
+  headRow.appendChild(th);
+}
+
+const tbody = document.getElementById('body-rows');
+for (const pos of SUB_POSITIONS) {
+  const tr = document.createElement('tr');
+  const th = document.createElement('th');
+  th.scope = 'row';
+  const text = cellText(pos);
+  if (text) {
+    th.textContent = text;
+  } else {
+    const blank = document.createElement('span');
+    blank.className = 'blank';
+    th.appendChild(blank); // 空白欄位:印出來手寫
+  }
+  tr.appendChild(th);
+  for (let d = 1; d <= DAYS; d++) {
+    const td = document.createElement('td');
+    td.className = 'check';
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+</script>
+</body>
+</html>

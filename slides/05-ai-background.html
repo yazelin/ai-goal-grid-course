@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 05 章 AI 桌布背景 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 05 章 — AI 桌布背景</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 — 第 05 章</p>
+  <h1>AI 桌布背景:<br>長任務的<em>正確姿勢</em></h1>
+  <p class="sub">job + 輪詢 + 等待 UX。學完:接一個要跑 1-3 分鐘的 AI 生圖任務,手機收訊閃一下、頁面重新整理,結果都不會丟。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">快任務和慢任務是<em>兩種工程</em>。<br>讓一條 HTTP 連線開著等三分鐘,等於在賭:代理不逾時、手機網路不抖、使用者不切頁——<em>三件事同時不出錯</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>正解:把長對話拆成<em>掛號-叫號</em></h2>
+  <ul class="points">
+    <li><strong>送單</strong>:送出任務立刻拿到單號(job id),連線馬上結束</li>
+    <li><strong>輪詢</strong>:之後每隔幾秒拿單號問「好了嗎」,每次都在一秒內完成</li>
+    <li>逾時風險<strong>整類消失</strong></li>
+    <li>單號可以存起來:重新整理、換分頁,拿著單號<strong>接著等</strong></li>
+    <li>所有 AI 慢任務(生圖、生影片、批次處理)都是這一套:<strong>非同步 job + 輪詢</strong></li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>上線版的生圖其實走<em>三層</em></h2>
+  <ul class="points">
+    <li><strong>主路 = OpenAI Images API(gpt-image-1)</strong>:官方 API 快且穩,Worker 同步呼叫、90 秒截斷,直接回 {mode:'sync', images}</li>
+    <li><strong>備援 = 自架 codex-image-service</strong>:沒設 OPENAI_API_KEY 才走;一張 70-180 秒,必須 job + 輪詢——本章的主角</li>
+    <li><strong>降級 = prompt 外帶</strong>:複製生圖 prompt 自己生、匯回來,零後端(第 07 章)</li>
+    <li>同步是<strong>有條件的例外</strong>:上游夠快夠穩、又有明確截斷才行;慢或不穩,job + 輪詢才是正解</li>
+    <li>job + 輪詢是所有 AI 慢任務的<strong>通用骨架</strong>,換掉哪個上游都用得上</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>備援的前置工程:上游不支援 job,<em>去把它修好</em></h2>
+  <pre>POST /v1/images/jobs        → 202 {id, status:"queued"}
+GET  /v1/images/jobs/{id}   → {status: queued|running|succeeded|failed,
+                               images: [{url, expires_at}], error}</pre>
+  <ul class="points">
+    <li>備援生圖後端 codex-image-service 原本只有同步端點:連線開著等 70-180 秒,504 之後結果拿不回</li>
+    <li>動工前第一件事不是寫前端,是去上游開 <strong>PR #5</strong> 加 job 端點</li>
+    <li>同步端點原樣保留,<strong>向下相容</strong></li>
+    <li>依賴的服務缺能力,選項不是只有忍耐或換一家,還有<strong>去把它修好</strong></li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>Worker 送單:鎖、扣額度、拿單號</h2>
+  <pre>// 同 IP 同時只能一張在生(in-flight lock),搶不到鎖回 409
+if (!(await acquireLock(env.DB, ip, "pending")))
+  return json({ error: "in_flight" }, 409, cors);
+
+// 先扣後跑:每日生圖額度先 -1,確定失敗才退
+const quota = await takeQuota(env.DB, { kind: "img", ip, limit: 3, day });
+if (!quota.ok) {
+  await releaseLock(env.DB, ip);
+  return json({ error: "quota_exceeded", resetAt: taipeiResetAt() }, 429, cors);
+}
+
+const result = await submitJob(env, payload);   // POST 上游 /v1/images/jobs
+await putJob(env.DB, result.data.id, { ip, day }); // 記單號+建立時間(逾時判定)
+return json({ jobId: result.data.id, mode: "job" }, 202, cors); // 202 = 已受理</pre>
+  <p class="code-note">鎖與扣額度是主路、備援共用;submitJob 之後是備援限定——有 OPENAI_API_KEY 時主路在這之前就同步打 OpenAI、直接回 {mode:'sync', images}。submitJob 還藏了一手:上游回 404(job API 未部署)就自動退回同步端點、85 秒截斷——Worker 和上游可以分開部署、互不卡死。</p>
+</section>
+
+<section class="slide">
+  <h2>Worker 查單:終局處理 + 660 秒自動退款</h2>
+  <pre>const st = res.data?.status;
+if (st === "queued" || st === "running") {
+  if (jobTimedOut(job)) {                        // 建立超過 660 秒還沒好
+    await refundJob(env.DB, jobId);              // 退額度 + 解鎖
+    return json({ status: "failed", error: "timeout", refunded: true }, 200, cors);
+  }
+  return json({ status: st }, 200, cors);        // 還在做,前端繼續等
+}
+if (st === "succeeded") {
+  await releaseLock(env.DB, job.ip);             // 成功:解鎖(額度照扣)
+  return json({ status: "succeeded", images: res.data.images || [] }, 200, cors);
+}
+await refundJob(env.DB, jobId);                  // 失敗:退額度 + 解鎖</pre>
+  <p class="code-note">上游卡死不能變成使用者的損失。refundJob 是冪等的:先查「退過沒」,前端連問十次逾時也只退一次,額度不會被退成負的。</p>
+</section>
+
+<section class="slide">
+  <h2>前端輪詢:5 秒一問,90 秒後放慢</h2>
+  <pre>while (true) {
+  const delay = attempt &lt; 18 ? 5000 : 10000;  // 5s × 18 次(90s)後改 10s
+  if (elapsed + delay &gt; 720000) throw new ApiError(0, { error: 'poll_timeout' });
+  await sleep(delay); elapsed += delay; attempt += 1;
+  try {
+    res = await fetch(`${workerBase()}/image/${jobId}`);
+    body = await res.json();
+  } catch {                                    // 網路抖一下不算失敗
+    if (++consecutiveErrors &gt;= 4) throw new ApiError(0, { error: 'network' });
+    continue;                                  // 連續錯 4 次才放棄
+  }
+  consecutiveErrors = 0;
+  if (body.status === 'succeeded') return body.images;
+  if (body.status === 'failed') throw new ApiError(200, { error: 'job_failed' });
+}                                              // queued / running → 下一輪</pre>
+  <p class="code-note">主路同步回 {mode:'sync', images} 時前端直接拿圖收工;收到 {mode:'job', jobId} 才進這個迴圈。前 90 秒多數圖會完成,問太慢使用者白等;之後問密一點也不會更快,只是浪費流量。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">兩個數字的關係</p>
+  <p class="big">前端 720 秒才放棄,<em>比 Worker 的 660 秒寬</em>。<br>使用者一定先收到「逾時、額度已退還」,而不是前端先放棄、留下懸念。<br>超時這種事,要讓<em>管帳的那一方先開口</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>pending job 持久化:重新整理也不丟單</h2>
+  <pre>// 單號到手立刻寫 localStorage
+api.savePendingJob({ jobId: sub.jobId, createdAt: new Date().toISOString() });
+images = await api.pollWallpaper(sub.jobId);
+api.clearPendingJob();                   // 終局(成功)才清掉
+
+// 頁面載入時:有未終局的單 → 不重送,接著等
+const pending = api.loadPendingJob();
+if (pending) {
+  goToStep(4);
+  const elapsedMs = Date.now() - Date.parse(pending.createdAt);
+  startGenUi(Date.now() - elapsedMs);    // 進度條從實際經過時間接著走,不歸零
+  const images = await api.pollWallpaper(pending.jobId, { elapsedMs });
+  api.clearPendingJob();
+}</pre>
+  <p class="code-note">成功/失敗/逾時這些「終局」都清 pending 單;純網路錯誤不清,網路恢復還能續傳。再按一次「生成」會改成恢復輪詢而不是重送——重送只會撞 409。</p>
+</section>
+
+<section class="slide">
+  <h2>等待 UX:三分鐘等得下去的進度條</h2>
+  <pre>const GEN_STAGES = ['AI 構圖中', 'AI 正在打草稿', '上色中', '收尾修飾中'];
+
+const tick = () =&gt; {
+  const elapsed = Date.now() - startedAt;
+  const idx = Math.floor(elapsed / 9000) % GEN_STAGES.length; // 文案每 9 秒輪播
+  genStageEl.textContent =
+    `${GEN_STAGES[idx]}…(已 ${mm}:${ss},一般約 1-3 分鐘)`;
+  pbarFill.style.width =
+    `${Math.min(96, (elapsed / 180000) * 100).toFixed(1)}%`;  // 封頂 96%
+};</pre>
+  <p class="code-note">上游不會告訴你「畫到 73%」,進度條必然是演的——但可以演得誠實。</p>
+</section>
+
+<section class="slide">
+  <h2>短短幾行裡的四個<em>心理設計</em></h2>
+  <ul class="points">
+    <li><strong>預告時間</strong>:「一般約 1-3 分鐘」先講——耐心是用預期管理出來的</li>
+    <li><strong>顯示已經過時間</strong>:「已 1:24」證明系統活著,沒有什麼比不動的進度條更勸退</li>
+    <li><strong>階段文案輪播</strong>:把黑盒子講成一個有進展的故事(文案是演的,「還在跑」是真的)</li>
+    <li><strong>進度條封頂 96%</strong>:走到 100% 卻還沒好是等待 UX 的頭號災難;「快好了」可以體面地撐到真的好</li>
+    <li>最後一哩:成功就<strong>立刻抓圖存 IndexedDB</strong>——上游網址 7 天過期,自己的成品放自己手上</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>同步硬等三分鐘</strong> → 代理 90-100 秒就可能切線;錢花了、圖生了、人看不到</li>
+    <li><strong>輪詢太密</strong> → 每秒問不會快一秒,只燒流量;5s 起步、90s 後退 10s</li>
+    <li><strong>重新整理就重送</strong> → 棄單重排還撞 409;單號到手立刻進 localStorage</li>
+    <li><strong>終局忘了清 pending 單</strong> → 永遠卡在「偵測到上次的生成」;但網路錯誤不清</li>
+    <li><strong>進度條走到 100% 卡住</strong> → 不知道真實進度就不要演到滿</li>
+    <li><strong>退款不冪等</strong> → 同一個失敗 job 被問很多次,沒查「退過沒」就會多退</li>
+    <li><strong>直接引用上游圖片網址</strong> → 7 天過期;成功當下抓回存 IndexedDB</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>長任務一律 <strong>job + 輪詢</strong>:送單拿單號、每幾秒問一次,逾時風險整類消失</li>
+    <li>生圖三層:主路 OpenAI <strong>同步</strong>(夠快夠穩 + 90 秒截斷的例外)、備援自架 <strong>job + 輪詢</strong>、降級 prompt 外帶</li>
+    <li>Worker 管帳:<strong>先扣後跑</strong>、660 秒冪等退款、同 IP 一次一張</li>
+    <li>前端 720 秒比 Worker 660 秒寬:讓管帳的先開口</li>
+    <li>單號立刻持久化,<strong>重新整理續傳</strong>、進度不歸零、不重複扣額度</li>
+    <li>等待 UX:預告時間、顯示已過時間、階段輪播、封頂 96%</li>
+  </ul>
+  <p class="sub">下一章:背景圖到手了,但九宮格的字呢?先看「叫 AI 連中文字一起畫」怎麼翻車,再用 canvas 一字不差地疊上去。</p>
+  <span class="demo-tag">對照成品:worker-deploy/src/index.js · app/js/api.js · demos/03-wallpaper/</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

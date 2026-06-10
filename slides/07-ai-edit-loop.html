@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 07 章 AI 編輯迴圈與降級設計 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 07 章 — AI 編輯迴圈與降級設計</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 — 第 07 章</p>
+  <h1>AI 編輯迴圈與降級設計:<br>prompt 是<em>可攜帶的資產</em></h1>
+  <p class="sub">學完:讓使用者用一句話修改 AI 背景;改文字換配色零成本即時重繪;服務掛掉時漏斗照樣走得完。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">迭代有兩種,成本差<em>一千倍</em>:<br>改背景 = 重新生圖,快則數十秒、慢則兩三分鐘,扣一次額度;<br>改文字、換配色 = canvas 重繪,<em>不到 0.1 秒,免費</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>先打破一個錯覺:生圖 API <em>沒有記憶</em></h2>
+  <ul class="points">
+    <li>在 ChatGPT 說「再亮一點」它聽得懂,是<strong>對話介面</strong>幫你把上一張圖帶著</li>
+    <li>直接呼叫 API 時,它是<strong>無狀態</strong>的</li>
+    <li>所謂「編輯」= 上一張圖當<strong>參考圖</strong>附上 + prompt 加一句修改要求,<strong>整張重新生成</strong></li>
+    <li>理解這件事,後面的程式碼就都顯而易見</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>edit 模式的請求:只差兩件事</h2>
+  <pre>// 原始 prompt 照舊:風格詞、構圖約束、「不准畫字」鐵律一個字都沒少
+let prompt = imagePrompt(req.goal, req.subGoals, preset.words, req.orientation);
+
+// 差異一:使用者那句話「追加」在後面,不是取代
+if (req.editInstruction) {
+  prompt += `\nRevision request from the user (apply it to the previous design): ${req.editInstruction}`;
+}
+
+const payload = { prompt,
+  size: req.orientation === 'portrait' ? '1024x1536' : '1536x1024' };
+
+// 差異二:上一張背景圖放進參考圖欄位(純 base64,去掉 data: 前綴)
+if (req.referenceImagesBase64?.length)
+  payload.reference_images_base64 = req.referenceImagesBase64;</pre>
+  <p class="code-note">只送「亮一點」三個字,模型就失去風格與構圖的所有上下文,生出來的是另一張不相干的圖。</p>
+</section>
+
+<section class="slide">
+  <h2>把上一張背景帶上:縮圖再上傳</h2>
+  <pre>// main.js:editInstruction 有值 = 修改模式
+if (editInstruction &amp;&amp; bgRecord) {
+  referenceImagesBase64.push(
+    await blobToBase64(await resizeImageBlob(bgRecord.blob, 1280)),
+  );
+}</pre>
+  <ul class="points">
+    <li>上一張背景在生成成功時已存進 IndexedDB(第 05 章)</li>
+    <li>第 04 章的兩個工具直接重用:<strong>resizeImageBlob</strong> 縮長邊 1280、<strong>blobToBase64</strong> 去前綴</li>
+    <li>送出後走哪條路由 Worker 決定(第 05 章的三層):主路 OpenAI 帶參考圖改打 <strong>images/edits</strong>、一樣同步回圖;自架備援才是同一個 job 端點、同一套輪詢——對 Worker 來說<strong>生成與修改是同一件事</strong>,差別只在有沒有參考圖</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>文字迭代零成本:只重繪,不重生</h2>
+  <pre>function rerenderWallpaper() {
+  renderWallpaper(wallCanvas, {
+    bgBitmap,                      // 背景不變,不重新生圖
+    cells: state.cells,
+    actions: state.actions,
+    styleId: state.wallpaper.styleId,
+    orientation: state.wallpaper.orientation,
+    mode: wallpaperMode,
+  });
+}</pre>
+  <p class="code-note">上一章「背景與文字解耦」的紅利在這裡兌現。成品直接把規則講給使用者聽:「不滿意可以輸入修改指示重生背景;改文字或換風格則即時重繪、不用重生。」把貴的路和免費的路明白標出來,使用者自然把額度花在刀口上。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">本章真正想教的行銷頁設計觀</p>
+  <p class="big">生圖服務在排隊、金鑰沒設、額度用完——大多數網站回一句「請稍後再試」,<em>等於送客</em>。<br>但我們手上握著一份完整的生圖 prompt,它<em>不是只有自家後端能用</em>。</p>
+</section>
+
+<section class="slide">
+  <h2>降級路徑:兩個純前端按鈕,<em>零後端依賴</em></h2>
+  <ul class="points">
+    <li><strong>(a) 複製生圖 prompt</strong>:風格詞、構圖約束、主題意象都是現成的,貼到 ChatGPT 或 Gemini 一樣能生——使用者多半本來就有帳號</li>
+    <li><strong>(b) 匯入背景圖</strong>:把使用者自己生好的圖收回來,接著合成文字、下載 PNG</li>
+    <li>成品收在步驟四「<strong>服務忙線或想自己生?</strong>」摺疊面板,生圖出錯時自動展開</li>
+    <li>引導文案把三步講完:<strong>貼過去生 → 下載圖 → 帶回來</strong></li>
+    <li>參考照片在使用者自己手上,直接附給 ChatGPT 即可——這條路連參考圖都不經過我們</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>(a) 複製生圖 prompt</h2>
+  <pre>function buildPortablePrompt(goal, subGoals, styleId, orientation) {
+  let p = imagePrompt(goal, subGoals, presetById(styleId).words, orientation);
+  // API 參數換成人話:外面的工具不吃 size: '1024x1536' 這種參數
+  p += orientation === 'portrait'
+    ? '\nAspect ratio 2:3, vertical phone wallpaper.'
+    : '\nAspect ratio 3:2, horizontal desktop wallpaper.';
+  return p;
+}
+
+copyBtn.addEventListener('click', async () =&gt; {
+  await navigator.clipboard.writeText(buildPortablePrompt(/* ... */));
+  showMsg(bgMsgEl, '已複製。貼到 ChatGPT 或 Gemini 生成,' +
+    '生好的圖用下方「匯入背景圖」帶回來。', 'ok');
+});</pre>
+  <p class="code-note">前端的 imagePrompt 模板與 Worker 端逐字同步。clipboard 在非 https 或 file:// 可能不可用——降級路徑自己也要有降級:備一個唯讀 textarea。</p>
+</section>
+
+<section class="slide">
+  <h2>(b) 匯入背景圖</h2>
+  <pre>importInput.addEventListener('change', async () =&gt; {
+  const file = importInput.files[0];
+  if (!file) return;
+  try {
+    bgBitmap = await createImageBitmap(file);
+    // 跟 AI 生成的背景同等對待:存 IndexedDB,標記來源是手動匯入
+    bgRecord = { blob: file, meta: { source: 'manual' },
+                 createdAt: new Date().toISOString() };
+    bgRecord.id = await idbPut('wallpapers', bgRecord);
+    rerenderWallpaper();   // cover 裁切吃任何比例,直接重繪
+  } catch {
+    showMsg(bgMsgEl, '這張圖讀不進來,請換一張(支援一般圖片格式)。');
+  }
+});</pre>
+  <p class="code-note">不用檢查長寬比——上一章的 coverRect 本來就吃任何比例。匯入的圖走完全相同的後續流程,連「修改背景」都能接著用(它會成為下一輪的參考圖)。</p>
+</section>
+
+<section class="slide">
+  <h2>最後一塊拼圖:錯誤訊息<em>把路標出來</em></h2>
+  <ul class="points">
+    <li>not_configured、queue_full、額度用完、生成逾時——錯誤面板的<strong>第一順位建議</strong>不是「稍後再試」</li>
+    <li>而是:「複製生圖 prompt 自己生,生好匯入回來」</li>
+    <li>服務掛掉的瞬間,頁面從「壞掉的產品」變成「<strong>換一條路的產品</strong>」</li>
+    <li>後端是<strong>加速器</strong>(免操作、有額度管理),不是必經之路</li>
+    <li>漏斗的最後一步——下載桌布、留 email——<strong>永遠走得到</strong></li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>以為 AI 記得上一張圖</strong> → API 無狀態;不附參考圖的「修改」等於完全重抽</li>
+    <li><strong>只送修改句、丟掉原 prompt</strong> → 修改句是追加,不是取代</li>
+    <li><strong>參考圖沒縮就上傳</strong> → 先縮長邊 1280 再轉 base64,別撞 20MB 上限</li>
+    <li><strong>clipboard API 默默失敗</strong> → 非 https / file:// 要備唯讀 textarea</li>
+    <li><strong>降級路徑藏太深</strong> → 使用者看不到出口等於沒有出口,出錯當下就指路</li>
+    <li><strong>匯入的圖比例不合就拒收</strong> → 不必,cover 裁切吃任何比例</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>迭代分兩層:<strong>貴的</strong>(重生背景)與<strong>免費的</strong>(canvas 重繪),UI 要明白標出來</li>
+    <li>API 沒有記憶:編輯 = 原 prompt + 修改句 + 上一張圖當參考圖</li>
+    <li><strong>prompt 是可攜帶的資產</strong>:複製出去自己生、匯入回來繼續合成</li>
+    <li>錯誤訊息把降級路徑標成主要出路,漏斗永遠走得完</li>
+  </ul>
+  <p class="sub">下一章:防刷與額度——你的金鑰背後是真鈔。Turnstile 人機驗證加四層防線,讓共用額度撐得住公開上線。</p>
+  <span class="demo-tag">對照成品:app/(故意不設金鑰走一次降級路徑) · demos/03-wallpaper/</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

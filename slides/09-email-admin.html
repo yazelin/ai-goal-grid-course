@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 09 章 Email 收集與後台 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 09 章 — Email 收集與後台</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 · 第 09 章</p>
+  <h1>Email 收集與後台:<br>留下名單,<em>當場</em>兌現承諾</h1>
+  <p class="sub">honeypot 擋機器人、UNIQUE 去重不報錯、Bearer token 後台、一鍵匯出 CSV。社群觸及是租來的,email 名單才是你自己的資產。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">免費價值<em>先給</em>,<br>留資換加值,<br>承諾<em>當場</em>兌現。</p>
+  <p class="sub">桌布 PNG 直接給,不設牆;email 表單放在下載旁邊,用「30 天行動追蹤模板」交換。訪客已經拿到主要價值,留資是加值交易,不是門票 — 轉換才不會帶著怨氣。</p>
+</section>
+
+<section class="slide">
+  <h2>「立即拿」是設計,不是文案</h2>
+  <ul class="points">
+    <li>第一版產品最容易在「<strong>我之後會寄給你</strong>」失信:要串 EDM、會進垃圾桶、會晚到</li>
+    <li>誘因改成靜態網頁 tracker.html:註冊成功的回應<strong>直接帶連結</strong>,當場點開、當場可印</li>
+    <li>承諾在同一個畫面裡兌現,不依賴任何寄信系統</li>
+    <li>名單先收著,真正的群發等你哪天要做,再匯出去</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>表單與 honeypot</h2>
+  <pre>&lt;form id="signup-form" novalidate&gt;
+  &lt;input type="email" name="email" placeholder="you@example.com"&gt;
+  &lt;input type="text" name="company" class="hp-field"
+         tabindex="-1" autocomplete="off" aria-hidden="true"&gt;
+  &lt;button type="submit"&gt;送出拿模板&lt;/button&gt;
+&lt;/form&gt;
+
+/* honeypot:移出視野但仍在 DOM(真人看不到,機器人照填) */
+.hp-field { position: absolute; left: -9999px;
+            width: 1px; height: 1px; opacity: 0; }</pre>
+  <p class="code-note">欄位越少轉換越高,所以只收 email。笨的灌名單機器人會把每個欄位都填滿 — company 有值就當機器人,但不回錯誤:假裝成功、不寫入,讓它以為得逞,不會回頭換手法。</p>
+</section>
+
+<section class="slide">
+  <h2>/signup 的完整防線</h2>
+  <pre>// worker-deploy/src/lib/signup.js(節錄)
+if (limited(ip)) return r(429, { error: "rate_limited" });  // 分鐘限流
+if (!(await verifyTurnstile(env, body.turnstileToken, ip)))
+  return r(403, { error: "turnstile_failed" });             // Turnstile
+if (body.company)                                           // honeypot
+  return r(200, { ok: true, gift: env.GIFT_URL });          // 假成功
+const email = String(body.email || "").trim().toLowerCase();
+if (!EMAIL_RE.test(email) || email.length &gt; 120)
+  return r(400, { error: "bad_email" });
+const quota = await takeQuota(db, { kind: "signup", ip, limit: 10, day });
+if (!quota.ok) return r(429, { error: "rate_limited" });    // D1 日配額
+await db.prepare(
+  "INSERT INTO signups (email, name, created_at, ip) VALUES (?, ?, ?, ?)")
+  .bind(email, name || null, now, ip).run();</pre>
+  <p class="code-note">分鐘限流是記憶體 Map(快、零成本,但 Worker 多實例會歸零,best-effort);D1 原子配額才是繞不過的那層 — 第 08 章的教訓在便宜端點上的應用。email 先 trim 再轉小寫,Abc@Mail.com 和 abc@mail.com 才算同一人。</p>
+</section>
+
+<section class="slide">
+  <h2>去重:重複送出<em>不是錯誤</em></h2>
+  <pre>} catch (e) {
+  if (String(e).includes("UNIQUE")) {   // schema:email TEXT NOT NULL UNIQUE
+    return r(200, { ok: true, already: true, gift: env.GIFT_URL });
+  }
+}
+
+// app/js/signup.js — 前端文案
+already ? '你已經在名單上了 —— 模板連結照樣再給你一次:'
+        : '完成,Email 已登記。這是你的 30 天行動追蹤模板:'</pre>
+  <p class="code-note">使用者換台電腦回來再填,看到「此 email 已存在」只會困惑 — 他要的是模板,再給一次就好;外人也無法用狀態碼探測誰在名單上。誠實註記:already 欄位本身仍可被探測,若收的是敏感名單(客戶、病患、會員),連 already 都拿掉,兩種回應完全一致。</p>
+</section>
+
+<section class="slide">
+  <h2>誘因即時兌現:tracker.html</h2>
+  <ul class="points">
+    <li>30 天行動追蹤表:八個子目標 × 三十天勾選格,A4 橫式列印 CSS,一鍵變紙本</li>
+    <li>和 App <strong>同源</strong> → 直接讀 localStorage,把使用者自己的九宮格帶進表格</li>
+    <li>領到的不是通用模板,是「<strong>印著你自己目標</strong>」的追蹤表 — 誘因的價值感就差在這裡</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>後台 admin.html:token gate</h2>
+  <pre>// app/admin.html — token 走標頭,不放網址
+const r = await fetch(apiBase() + '/list',
+  { headers: { Authorization: 'Bearer ' + t } });
+
+// worker-deploy/src/lib/signup.js — 與 Secret 比對
+export async function handleList({ db, env, bearer }) {
+  if (!env.ADMIN_TOKEN || bearer !== env.ADMIN_TOKEN) {
+    return { status: 401, body: { error: "unauthorized" } };
+  }
+  const { results } = await db.prepare(
+    "SELECT id, email, name, created_at, ip FROM signups ORDER BY id DESC").all();
+  return { status: 200, body: { signups: results, count: results.length } };
+}</pre>
+  <p class="code-note">兩條前課就講過的鐵則:密碼只存 Worker Secret(ADMIN_TOKEN),永不出現在前端程式碼;傳輸走 Authorization 標頭 — ?token= 會被瀏覽器歷史和 CDN log 記下。</p>
+</section>
+
+<section class="slide">
+  <h2>token 存哪:sessionStorage,不是 localStorage</h2>
+  <div class="cols">
+    <div>
+      <h3>localStorage 的爆炸半徑</h3>
+      <ul>
+        <li>yazelin.github.io 是<strong>共用 origin</strong>:同帳號所有專案頁共用同一個儲存空間</li>
+        <li>任何一個舊專案有 XSS,注入的腳本就讀得到整個 origin 的 localStorage</li>
+        <li>長效憑證放這裡,等於讓爆炸半徑涵蓋所有歷史包袱</li>
+      </ul>
+    </div>
+    <div>
+      <h3>sessionStorage 的交易</h3>
+      <ul>
+        <li>只活在這個分頁,關了就消失</li>
+        <li>代價:每次開後台重輸一次密碼</li>
+        <li>換到:被偷窗口從「永久」縮成「分頁開著的期間」— 後台一天開不了幾次,划算</li>
+      </ul>
+    </div>
+  </div>
+  <p class="sub">安全設計講出來就是信任感:輸入框上方直接註明「只記到這個分頁關閉為止」。</p>
+</section>
+
+<section class="slide">
+  <h2>匯出 CSV,接進 EDM 工具</h2>
+  <pre>// app/admin.html — RFC 4180:欄位全包雙引號、引號翻倍、CRLF 列尾
+function buildCsv(items) {
+  const q = (v) =&gt; '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['email', 'name', 'created_at', 'ip']]
+    .concat(items.map((s) =&gt; [s.email, s.name || '', s.created_at, s.ip || '']));
+  return rows.map((r) =&gt; r.map(q).join(',')).join('\r\n') + '\r\n';
+}
+// 開頭加 UTF-8 BOM:Excel 直接開啟也認得中文
+const blob = new Blob(['\uFEFF' + buildCsv(list)],
+  { type: 'text/csv;charset=utf-8' });</pre>
+  <p class="code-note">稱呼裡一個逗號就能撐破整列;沒有 BOM,Excel 開起來中文全亂碼。匯出後丟進 MailerLite / Mailchimp / Brevo 的「匯入聯絡人」,你的第一波 email 行銷就有對象了。</p>
+</section>
+
+<section class="slide">
+  <h2>驗收</h2>
+  <ul class="points">
+    <li>填 email 送出:畫面<strong>當場</strong>出現模板連結;tracker.html 帶入自己的子目標,列印預覽是白底 A4</li>
+    <li>同一 email 再送一次:「你已經在名單上了」,連結照給、不報錯</li>
+    <li>admin.html 輸對密碼看到名單;故意輸錯,看到「密碼不對」而不是名單</li>
+    <li>CSV 用 Excel 開:中文正常、欄位對齊</li>
+    <li>關掉後台分頁重開:要求重輸密碼 — sessionStorage 生效</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>裸表單沒擋機器人</strong> — 公開端點一定被灌垃圾:honeypot + 分鐘限流 + Turnstile + D1 日配額,四道都上</li>
+    <li><strong>把重複註冊當錯誤</strong> — 體驗中斷,還從狀態碼洩漏名單成員</li>
+    <li><strong>誘因開空頭支票</strong> — 用靜態資產讓承諾在同一個畫面兌現</li>
+    <li><strong>管理密碼放進網址</strong> — 一律走 Authorization 標頭</li>
+    <li><strong>個資責任</strong> — 寫清楚用途、不收沒必要的欄位、正式營運補退訂機制</li>
+  </ul>
+  <span class="demo-tag">對照:demos/05-email + app/admin.html + app/assets/tracker.html</span>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>漏斗位置決定成敗:主要價值不設牆,留資是加值交易</li>
+    <li>承諾當場兌現:tracker.html 靜態資產,不依賴寄信系統</li>
+    <li>去重回成功不報錯;敏感名單連 already 都不回</li>
+    <li>後台三件套:Worker Secret + Bearer 標頭 + sessionStorage;出口是 RFC 4180 CSV</li>
+  </ul>
+  <span class="demo-tag">下一章:第 10 章 — 進階 9×9 與發佈:展開 81 格,讓全世界(和 AI)看見</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

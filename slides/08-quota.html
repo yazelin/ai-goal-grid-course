@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230e1420%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%273.2%27 fill=%27%23c9a44e%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 08 章 防刷與額度 — AI 互動行銷頁實戰 — 目標九宮格</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<header class="bar"><span>第 08 章 — 防刷與額度</span><span><a href="index.html">目錄</a> &nbsp; <span id="counter"></span></span></header>
+
+<section class="slide">
+  <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 · 第 08 章</p>
+  <h1>防刷與額度:<br>你的金鑰背後是<em>真鈔</em></h1>
+  <p class="sub">Worker 端點是公開網址,任何人十行迴圈就能整夜打它。四層防線的目標:讓正常人的一天剛好夠用、讓腳本的一秒鐘必然碰壁。</p>
+</section>
+
+<section class="slide statement">
+  <p class="kicker">核心觀念</p>
+  <p class="big">免費給人玩,<br>不等於免費給<em>腳本</em>玩。</p>
+  <p class="sub">/fill 燒 Groq 額度;/image 主路每張都是 OpenAI Images API 按張計費的帳單,備援燒自架服務的 ChatGPT 訂閱——防線同時護著兩者。你照本課自己部署一套時,燒的就是你的錢。</p>
+</section>
+
+<section class="slide">
+  <h2>先盤點你要保護的東西</h2>
+  <table>
+    <tr><th>端點</th><th>燒什麼</th><th>每日配額(每 IP)</th></tr>
+    <tr><td>POST /fill <span class="dim">AI 補格/展開</span></td><td>Groq API 額度</td><td>12 次</td></tr>
+    <tr><td>POST /image <span class="dim">AI 桌布背景</span></td><td>OpenAI Images API 按張計費;備援燒 ChatGPT 訂閱</td><td>3 次</td></tr>
+    <tr><td>POST /signup <span class="dim">email 留資</span></td><td>D1 寫入(便宜,但會被灌垃圾)</td><td>10 次</td></tr>
+  </table>
+  <p class="sub">數字放 wrangler.toml 的 [vars],要調不用改程式。原則:最貴的資源,配額壓最低。</p>
+</section>
+
+<section class="slide">
+  <h2>四層防線,順序固定</h2>
+  <ul class="points">
+    <li><strong>1. Turnstile</strong> — 無感人機驗證:多數真人完全無感,腳本拿不到 token</li>
+    <li><strong>2. 每日配額</strong> — D1 一條原子 SQL,繞不過的那層</li>
+    <li><strong>3. in-flight lock</strong> — 同 IP 同時只跑一張生圖</li>
+    <li><strong>4. 先扣後跑</strong> — 失敗自動退款,退款必須冪等</li>
+    <li>處理順序:Turnstile → lock → 扣額 → <strong>扣完才呼叫上游</strong></li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>第一層:Turnstile 無感驗證</h2>
+  <pre>// worker-deploy/src/lib/turnstile.js
+export async function verifyTurnstile(env, token, ip) {
+  if (!env.TURNSTILE_SECRET) {
+    console.warn("TURNSTILE_SECRET 未設,跳過 Turnstile 驗證");
+    return true; // fail-open:部署過渡期不擋人
+  }
+  if (!token) return false;
+  const form = new URLSearchParams();
+  form.set("secret", env.TURNSTILE_SECRET);
+  form.set("response", token);
+  const res = await fetch(VERIFY_URL, { method: "POST", body: form });
+  return (await res.json()).success === true;
+}</pre>
+  <p class="code-note">secret 與 sitekey 要兩邊同時就位,部署總有先後 — secret 未設就硬擋,過渡期會全站 403。fail-open 的代價是暫時少一層,但後面還有三層,每層都更硬。</p>
+</section>
+
+<section class="slide">
+  <h2>反面教材:KV 讀-改-寫(沒上線)</h2>
+  <pre>// 第一版設計:看起來會動,單人測試都過
+const used = Number(await env.QUOTA.get(key)) || 0;
+                          // 請求 A、B 同時讀到 2
+if (used >= limit) return tooMany();
+                          // 兩個都通過檢查
+await env.QUOTA.put(key, String(used + 1));
+                          // 兩個都寫 3:多跑一次,少算一次</pre>
+  <p class="code-note">「讀、檢查、寫」是三個動作,沒有任何機制阻止插隊 — 同時發 20 個請求,大半都在「還沒寫回」的窗口通過。何況 KV 是最終一致儲存,本來就不是計數器。這顆雷是上線前的對抗式 review 抓出來的:「看起來會動」不等於「攻擊下仍然正確」。</p>
+</section>
+
+<section class="slide">
+  <h2>正解:檢查與加一,壓進<em>一條原子 SQL</em></h2>
+  <pre>// worker-deploy/src/lib/quota.js — 改用 D1(免費 SQLite)
+export async function takeQuota(db, { kind, ip, limit, day }) {
+  const row = await db.prepare(
+    `INSERT INTO quota_counts (day, ip, kind, count) VALUES (?, ?, ?, 1)
+     ON CONFLICT(day, ip, kind) DO UPDATE SET count = count + 1
+     WHERE count &lt; ? RETURNING count`,
+  ).bind(day, ip, kind, limit).first();
+  if (!row) return { ok: false };   // 沒有列回來 = 超限
+  return { ok: true, count: row.count };
+}</pre>
+  <p class="code-note">資料庫保證兩個併發請求必有先後,誰都插不了隊。超限回 429 並附 resetAt(台北時間明日 00:00),前端講得出「幾點回來」,並引導 BYO 自帶金鑰。</p>
+</section>
+
+<section class="slide">
+  <h2>第三層:同 IP 同時只跑一張</h2>
+  <pre>// 先清過期鎖,再搶鎖;RETURNING 無列 = 沒搶到(回 409)
+export async function acquireLock(db, ip, jobId, now = Date.now()) {
+  await db.prepare("DELETE FROM locks WHERE expires_at &lt; ?")
+    .bind(now).run();
+  const row = await db.prepare(
+    `INSERT INTO locks (ip, job_id, expires_at) VALUES (?, ?, ?)
+     ON CONFLICT(ip) DO NOTHING RETURNING ip`,
+  ).bind(ip, jobId, now + 900_000).first();
+  return !!row;
+}</pre>
+  <p class="code-note">鎖一定要有期限(這裡 15 分鐘),不然使用者關掉網頁,IP 就永遠被鎖死。409 的文案要講人話:「另一個生成正在進行(可能是你稍早送出的請求),最多 15 分鐘後自動解鎖」。</p>
+</section>
+
+<section class="slide">
+  <h2>第四層:先扣後跑</h2>
+  <pre>// worker-deploy/src/index.js — /image 的順序,一行都不能換
+if (!(await verifyTurnstile(env, body.turnstileToken, ip)))
+  return json({ error: "turnstile_failed" }, 403, cors);   // 1
+if (!(await acquireLock(env.DB, ip, "pending")))
+  return json({ error: "in_flight" }, 409, cors);          // 2
+const quota = await takeQuota(env.DB, { kind: "img", ip, limit, day });
+if (!quota.ok) {                                           // 3 先扣
+  await releaseLock(env.DB, ip);
+  return json({ error: "quota_exceeded", resetAt: taipeiResetAt() }, 429, cors);
+}
+// 4. 扣完才呼叫上游;送單失敗 → 退 1 + 解鎖</pre>
+  <p class="code-note">「跑完才扣」的話,生圖跑著的那幾十秒到幾分鐘裡,同 IP 的請求個個都在「還沒扣」窗口通過。先扣的不公平用退款補回:主路 OpenAI 回錯或撞 90 秒截斷、備援送單失敗、job 失敗、逾時 660 秒,Worker 都自動退額並解鎖。</p>
+</section>
+
+<section class="slide">
+  <h2>退款必須<em>冪等</em></h2>
+  <pre>// 搶到 refunded 0→1 這個翻轉的那一次,才真的退
+const marked = await db.prepare(
+  "UPDATE jobs SET refunded = 1 WHERE id = ? AND refunded = 0 RETURNING id",
+).bind(jobId).first();
+if (!marked) return false;            // 已退過,跳過
+await refundQuota(db, { kind: "img", ip: job.ip, day: job.day });
+await releaseLock(db, job.ip);</pre>
+  <p class="code-note">前端每 5 秒輪詢一次,失敗狀態會被讀到很多次 — 每次都退 1,失敗一次反而變成送額度。配額、lock、退款:三層原子操作,同一個 ON CONFLICT / RETURNING 句型。</p>
+</section>
+
+<section class="slide">
+  <h2>CORS 不是濫用邊界</h2>
+  <pre>curl -s -X POST https://goal-grid.yazelinj303.workers.dev/fill \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"core","cells":[null,null,null,null,"學好英文",
+       null,null,null,null]}'
+# 不經瀏覽器、沒有 Origin —— 請求照樣進來</pre>
+  <p class="code-note">CORS 是瀏覽器的自律規範,只有瀏覽器會遵守;它保護的是「使用者在別的網站上不被偷偷代打」,不是你的額度。接住 curl 的是配額層 — 這就是四層一層都不能省的原因。</p>
+</section>
+
+<section class="slide">
+  <h2>驗收</h2>
+  <ul class="points">
+    <li>開兩個分頁同時生圖:第二個<strong>立刻</strong>收到 409「另一個生成正在進行」</li>
+    <li>同日生圖 3 次再按:看到 429 + 明日 00:00 重置 + BYO 引導,<strong>不是無聲失敗</strong></li>
+    <li>用 curl 直打一次:體會「CORS 擋不住它」,接住它的是配額層</li>
+    <li>自部署還沒設 TURNSTILE_SECRET:功能照常,log 出現跳過驗證警告 — fail-open 生效</li>
+  </ul>
+  <span class="demo-tag">對照:demos/04-quota — 前端模擬 429 / 409 / 退款重試,不燒額度玩遍每種狀態</span>
+</section>
+
+<section class="slide">
+  <h2>常見坑</h2>
+  <ul class="points">
+    <li><strong>任何「讀-改-寫」計數都有併發洞</strong> — KV、Worker 記憶體 Map 都一樣,計數交給資料庫原子操作</li>
+    <li><strong>退款不冪等</strong> — 輪詢重複讀到失敗狀態,失敗反而變成送額度</li>
+    <li><strong>lock 沒期限</strong> — 使用者關頁斷線,IP 永遠被鎖</li>
+    <li><strong>配額日期沒帶時區</strong> — 用 UTC 切日,台北使用者早上 8 點被「重置」,訊息全亂</li>
+    <li><strong>429 文案冷冰冰</strong> — 要給重置時間和出路:BYO 金鑰、或複製 prompt 自己生(第 07 章)</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h2>重點回顧</h2>
+  <ul class="points">
+    <li>四層防線:Turnstile → 每日配額 → in-flight lock → 先扣後跑 + 冪等退款</li>
+    <li>計數一律交給 D1 的一條原子 SQL — <strong>沒有列回來,就是超限</strong></li>
+    <li>CORS 只管瀏覽器;防濫用是配額層的事</li>
+    <li>文案也是防線的一部分:429 給重置時間與出路,409 講人話</li>
+  </ul>
+  <span class="demo-tag">下一章:第 09 章 — Email 收集與後台:留下名單,當場兌現承諾</span>
+</section>
+
+<div class="progress"><i id="prog"></i></div>
+<p class="navhint">← → 翻頁</p>
+<script src="deck.js"></script>
+</body>
+</html>

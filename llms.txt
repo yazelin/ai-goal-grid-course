@@ -1,0 +1,45 @@
+# AI 互動行銷頁實戰 — 目標九宮格
+
+> 教行銷人員把 AI 行銷頁零件整合成完整產品的實戰課程。
+> 範例產品:訪客用 AI 填好「目標九宮格」(源自原田メソッド、
+> 大谷翔平高中用過的目標達成表方法),生成專屬桌布下載,
+> 並以 30 天行動追蹤模板為誘因留下 email。
+> 前置課程:AI 互動行銷頁實作課
+> https://yazelin.github.io/ai-marketing-pages-course/
+
+## 成品
+
+- [目標九宮格 App](https://yazelin.github.io/ai-goal-grid-course/app/):
+  3×3 填寫 + AI 補格 + 展開 81 格 + AI 桌布背景 + canvas 文字合成 +
+  email 留資。無金鑰時可離線體驗(預設漸層背景)。
+
+## 課程章節(course/)
+
+- 00 總覽與前課銜接
+- 00c 金鑰申請指南(OpenAI / Groq key 申請、ChatGPT 介面手動生圖)
+- 01 產品定位與命名(商標研究實錄)
+- 02 九宮格 UI 與資料模型
+- 03 AI 補格(Worker + LLM JSON 輸出)
+- 04 圖片上傳與前端縮圖
+- 05 AI 桌布背景(非同步 job + 輪詢 + 長等待 UX)
+- 06 canvas 文字合成(含 AI 畫中文字翻車示範)
+- 07 AI 編輯迴圈
+- 08 防刷與額度(Turnstile + D1 原子配額)
+- 09 Email 收集與 admin 後台
+- 10 進階 9×9 與發佈 SEO/AEO
+
+## 階段性 demos(demos/)
+
+- 01-grid-ui:九宮格 UI + localStorage
+- 02-ai-fill:AI 補格(BYO key 直連)
+- 03-wallpaper:canvas 桌布合成
+- 04-quota:配額與錯誤處理 UX
+- 05-email:email 留資表單
+
+## 架構
+
+GitHub Pages 靜態前端(零 build vanilla JS)+ 單一 Cloudflare Worker
+(/fill /image /signup,D1 原子配額 + Turnstile)。生圖走三層:
+主 = OpenAI Images API(gpt-image-1,同步,90 秒截斷);
+備 = codex-image-service(自架 FastAPI,非同步 job API,
+OpenAI 金鑰未設才走);降級 = 複製生圖 prompt 自行生成再匯回(零後端)。

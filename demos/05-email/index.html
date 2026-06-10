@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo 05 — Email 留資與 honeypot|目標九宮格</title>
+<meta name="description" content="目標九宮格課程 demo 05:email 留資表單 + honeypot 防機器人 + 成功/重複/錯誤三態文案,打真實 Cloudflare Worker。對應課程第 09 章。">
+<style>
+/* ---- 夜空製圖室主題(與 app/ 同款,單檔內嵌精簡版)---- */
+:root {
+  --bg: #0e1420;
+  --bg-deep: #0a0f18;
+  --panel: rgba(20, 28, 44, 0.55);
+  --panel-2: rgba(13, 18, 29, 0.72);
+  --line-gold: rgba(201, 164, 78, 0.28);
+  --line-gold-soft: rgba(201, 164, 78, 0.14);
+  --line-cool: rgba(140, 156, 184, 0.16);
+  --gold: #c9a44e;
+  --gold-bright: #e7c87e;
+  --gold-deep: #8a6c2c;
+  --ink: #e9e6da;
+  --ink-dim: #aab3c5;
+  --muted: #76819a;
+  --ok: #8be29b;
+  --bad: #ff7a8a;
+  --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+  --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 700px at 72% -8%, rgba(56, 80, 130, 0.32), transparent 62%),
+    radial-gradient(900px 600px at 8% 108%, rgba(201, 164, 78, 0.07), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 31px 47px, rgba(233, 230, 218, 0.40) 50%, transparent 51%),
+    radial-gradient(1px 1px at 173px 113px, rgba(233, 230, 218, 0.22) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 97px 191px, rgba(201, 164, 78, 0.30) 50%, transparent 51%),
+    radial-gradient(1px 1px at 229px 23px, rgba(233, 230, 218, 0.28) 50%, transparent 51%);
+  background-size: 260px 230px;
+  opacity: 0.5;
+}
+.wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 26px 20px 60px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 28px; }
+.brand-name { font-family: var(--serif); font-size: 19px; font-weight: 700; letter-spacing: 0.12em; }
+.brand-tag { font-size: 11px; letter-spacing: 0.3em; color: var(--gold); opacity: 0.8; }
+.kicker { font-size: 12px; letter-spacing: 0.32em; color: var(--gold); margin-bottom: 10px; }
+h1 { font-family: var(--serif); font-size: clamp(1.6rem, 5.4vw, 2.4rem); line-height: 1.35; margin-bottom: 12px; }
+.lede { color: var(--ink-dim); max-width: 640px; margin-bottom: 34px; }
+h2 { font-family: var(--serif); font-size: 1.25rem; margin-bottom: 14px; color: var(--gold-bright); }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line-gold-soft);
+  border-radius: 12px;
+  padding: 24px 22px;
+  margin-bottom: 26px;
+  backdrop-filter: blur(4px);
+}
+.hint { font-size: 13px; color: var(--muted); }
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88em;
+  background: rgba(201, 164, 78, 0.10);
+  border-radius: 4px; padding: 1px 6px;
+  color: var(--gold-bright);
+}
+pre {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+pre code { background: none; padding: 0; color: var(--ink-dim); }
+
+label { display: block; font-size: 13px; letter-spacing: 0.06em; color: var(--ink-dim); margin-bottom: 6px; }
+input[type="email"], input[type="text"], input[type="url"] {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--sans); font-size: 14.5px;
+  padding: 11px 12px;
+  transition: border-color 0.2s;
+}
+input:focus { outline: none; border-color: var(--gold); }
+.field { margin-bottom: 16px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.btn {
+  font-family: var(--sans); font-size: 13.5px; letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  background: none;
+  border: 1px solid var(--line-gold);
+  border-radius: 8px;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn:hover { border-color: var(--gold); background: rgba(201, 164, 78, 0.08); }
+.btn-primary { background: var(--gold); color: #141a26; font-weight: 700; border-color: var(--gold); }
+.btn-primary:hover { background: var(--gold-bright); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+/* honeypot:移出視野但表單仍會帶值送出 —— 不能用 display:none,
+   部分填表機器人會跳過隱形欄位,off-screen 比較「香」 */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px; height: 1px;
+  overflow: hidden;
+}
+
+/* 結果三態 */
+.result { margin-top: 16px; border-radius: 10px; padding: 14px 16px; font-size: 14px; display: none; }
+.result.show { display: block; }
+.result.ok { border: 1px solid rgba(139, 226, 155, 0.4); background: rgba(139, 226, 155, 0.07); }
+.result.already { border: 1px solid var(--line-gold); background: rgba(201, 164, 78, 0.08); }
+.result.err { border: 1px solid rgba(255, 122, 138, 0.4); background: rgba(255, 122, 138, 0.07); }
+.result .title { font-weight: 700; margin-bottom: 4px; }
+.result.ok .title { color: var(--ok); }
+.result.already .title { color: var(--gold-bright); }
+.result.err .title { color: var(--bad); }
+.gift-btn {
+  display: inline-block;
+  margin-top: 10px;
+  background: var(--gold); color: #141a26;
+  font-weight: 700; font-size: 14px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.gift-btn:hover { background: var(--gold-bright); }
+
+.banner {
+  border: 1px solid rgba(255, 122, 138, 0.4);
+  background: rgba(255, 122, 138, 0.07);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  margin-bottom: 22px;
+}
+.banner b { color: var(--bad); }
+
+.bot-toggle { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-dim); margin: 4px 0 14px; cursor: pointer; }
+.bot-toggle input { accent-color: var(--gold); }
+
+ul.notes { margin: 8px 0 0 22px; color: var(--ink-dim); }
+ul.notes li { margin-bottom: 8px; }
+ul.notes b { color: var(--ink); font-weight: 600; }
+.callout {
+  border-left: 3px solid var(--gold);
+  background: rgba(201, 164, 78, 0.06);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 13.5px; color: var(--ink-dim);
+  margin-top: 14px;
+}
+details { margin-top: 14px; }
+summary { cursor: pointer; color: var(--gold-bright); font-size: 13.5px; }
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line-cool); font-size: 13px; color: var(--muted); }
+footer a { color: var(--gold); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <span class="brand-name">目標九宮格</span>
+    <span class="brand-tag">DEMO 05</span>
+  </header>
+
+  <p class="kicker">課程第 09 章 — Email 收集</p>
+  <h1>留資表單:honeypot 與三態文案</h1>
+  <p class="lede">
+    漏斗的最後一步:PNG 已經免費給了,現在用「30 天行動追蹤模板」交換 email。
+    這頁打的是<b>真實部署的 Cloudflare Worker</b> —— 送出後 email 真的會寫進 D1,
+    回應裡的模板連結當場兌現。
+  </p>
+
+  <div class="banner" id="fileBanner" hidden>
+    <b>注意:</b>你正用 <code>file://</code> 直接開這頁。瀏覽器會以 null origin 發跨網域請求,
+    Worker 的 CORS 白名單(localhost / yazelin.github.io)不會放行,送出會失敗。
+    請在這個資料夾跑 <code>python3 -m http.server</code> 再用
+    <code>http://localhost:8000</code> 開啟,或改用線上版。
+  </div>
+
+  <section class="panel">
+    <h2>一、留下 Email,換 30 天行動追蹤模板</h2>
+    <form id="signupForm" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+
+      <!-- honeypot:真人看不到也填不到;機器人會「順手」填滿所有欄位 -->
+      <div class="hp-field" aria-hidden="true">
+        <label for="company">公司(請勿填寫)</label>
+        <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+      </div>
+
+      <label class="bot-toggle">
+        <input type="checkbox" id="botMode">
+        教學開關:模擬機器人(自動填入隱藏的 honeypot 欄位再送出)
+      </label>
+
+      <div class="row">
+        <button type="submit" class="btn btn-primary" id="submitBtn">送出,立即拿模板</button>
+        <span class="hint">不寄信、不驗證信箱 —— 模板連結直接顯示在下方,承諾當場兌現。</span>
+      </div>
+    </form>
+
+    <div class="result" id="result">
+      <div class="title" id="resultTitle"></div>
+      <div id="resultBody"></div>
+      <a class="gift-btn" id="giftBtn" href="#" target="_blank" rel="noopener" hidden>領取 30 天行動追蹤模板</a>
+    </div>
+
+    <details>
+      <summary>看原始回應(教學用)</summary>
+      <pre><code id="rawResp">(尚未送出)</code></pre>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>二、Worker 端點設定</h2>
+    <div class="field">
+      <label for="workerUrl">POST 目標(預設是課程部署的真 Worker;學員自部署後換成自己的網址)</label>
+      <input type="url" id="workerUrl" value="https://goal-grid.yazelinj303.workers.dev/signup" spellcheck="false">
+    </div>
+    <p class="hint">送出的 JSON:<code>{"email": "...", "company": "..."}</code> —— company 是 honeypot,真人永遠是空字串。</p>
+  </section>
+
+  <section class="panel">
+    <h2>三、這頁在教什麼</h2>
+    <ul class="notes">
+      <li><b>honeypot</b>:表單藏一個叫 <code>company</code> 的欄位,用 CSS 移到畫面外(不能用 <code>display:none</code>,聰明一點的機器人會跳過隱形欄位)。真人看不到所以不會填;機器人習慣把每個欄位都填滿。Worker 看到有值就<b>假裝成功</b>但不寫入 —— 不回錯誤,免得機器人知道自己被識破。</li>
+      <li><b>三態文案</b>:成功(寫入 D1)/ 重複(email 已存在,回 <code>already: true</code> 並照樣給模板 —— 不洩漏名單、對真人也友善)/ 錯誤(格式不對 400、太頻繁 429)。三種都要有明確的下一步,不能讓使用者對著轉圈圈發呆。</li>
+      <li><b>承諾即時兌現</b>:註冊成功的回應直接帶 <code>gift</code> 連結,前端顯示成按鈕。不依賴寄信 —— 寄信系統(MailerLite/Brevo)是之後的加值,不是兌現的前提。</li>
+      <li><b>後端防線</b>:這個端點還有每分鐘 5 次 + 每日 10 次/IP 的限流(跟 demo 04 同一套思路),email 正規化(trim + 小寫)後才進 D1,UNIQUE 衝突就是「重複」的判斷依據。</li>
+    </ul>
+    <div class="callout">
+      收進 D1 的名單去哪了?完整版有 <code>admin.html</code>:用 Bearer token 看名單、匯出 CSV,
+      丟進任何 EDM 工具都行 —— 名單是你的資產,不被任何平台綁架。
+    </div>
+  </section>
+
+  <footer>
+    <p>↑ 完整版:<a href="../../app/">../../app/</a>(表單接在桌布下載旁,還有 admin 後台與 CSV 匯出)</p>
+    <p>AI 互動行銷頁實戰 — 目標九宮格.方法淵源:原田メソッド(目標達成シート);「マンダラチャート」為他人註冊商標,本課程與其無關。</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+const URL_KEY = 'goal-grid-demo05-worker-url'; // 本 demo 自己的鑰匙,不動完整版的設定
+
+const form = document.getElementById('signupForm');
+const emailInput = document.getElementById('email');
+const companyInput = document.getElementById('company');
+const botMode = document.getElementById('botMode');
+const submitBtn = document.getElementById('submitBtn');
+const workerUrlInput = document.getElementById('workerUrl');
+const result = document.getElementById('result');
+const resultTitle = document.getElementById('resultTitle');
+const resultBody = document.getElementById('resultBody');
+const giftBtn = document.getElementById('giftBtn');
+const rawResp = document.getElementById('rawResp');
+
+// file:// 直開的提醒(CORS 會擋,先講清楚,不讓學員白白卡住)
+if (location.protocol === 'file:') {
+  document.getElementById('fileBanner').hidden = false;
+}
+
+// Worker URL:記住學員改過的值
+try {
+  const saved = localStorage.getItem(URL_KEY);
+  if (saved) workerUrlInput.value = saved;
+} catch { /* 略過 */ }
+workerUrlInput.addEventListener('change', () => {
+  try { localStorage.setItem(URL_KEY, workerUrlInput.value.trim()); } catch { /* 略過 */ }
+});
+
+function show(state, title, bodyHtml, gift) {
+  result.className = 'result show ' + state;
+  resultTitle.textContent = title;
+  resultBody.innerHTML = bodyHtml;
+  if (gift) {
+    giftBtn.href = gift;
+    giftBtn.hidden = false;
+  } else {
+    giftBtn.hidden = true;
+  }
+}
+
+// 錯誤碼 → 人話(對照 Worker 實際會回的 error 值)
+function describeError(status, body) {
+  const code = body && body.error;
+  if (status === 400 || code === 'bad_email') {
+    return 'Email 格式看起來不對,檢查一下再送一次。';
+  }
+  if (status === 429) {
+    return '請求太頻繁(這個端點限每分鐘 5 次、每日 10 次/IP)—— 等一下再試。這也是 demo 04 講的配額防線,連留資表單都有。';
+  }
+  if (status === 403 || code === 'turnstile_failed') {
+    return '站方開啟了 Turnstile 人機驗證,這個簡化版 demo 沒掛驗證 widget,所以被擋下 —— 完整版 app 有掛,去那邊試。';
+  }
+  return `伺服器回了 ${status}${code ? '(' + code + ')' : ''},稍後再試。`;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = emailInput.value.trim();
+  if (!email) {
+    show('err', '先填 Email', '填上 Email,模板馬上給你。');
+    emailInput.focus();
+    return;
+  }
+  // 教學開關:模擬機器人,把 honeypot 填上值
+  const company = botMode.checked ? 'Totally Real Company Inc.' : companyInput.value.trim();
+
+  const url = workerUrlInput.value.trim();
+  submitBtn.disabled = true;
+  const label = submitBtn.textContent;
+  submitBtn.textContent = '送出中…';
+  rawResp.textContent = '(等待回應…)';
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, company }),
+    });
+    let body = null;
+    try { body = await resp.json(); } catch { /* 非 JSON 回應 */ }
+    rawResp.textContent = `HTTP ${resp.status}\n` + JSON.stringify(body, null, 2);
+
+    if (resp.ok && body && body.ok === true) {
+      if (botMode.checked) {
+        // 機器人視角:伺服器假裝成功,其實沒寫入 —— 拆給學員看
+        show('already', '看起來成功了 —— 但其實沒有',
+          '你剛剛是「機器人」:honeypot 欄位有值,Worker 回了一模一樣的成功回應,但 email <b>沒有寫進資料庫</b>。' +
+          '機器人拿到 200 就心滿意足地走了,名單保持乾淨。把上面的開關關掉,再用真人身份送一次。');
+      } else if (body.already === true) {
+        show('already', '你已經在名單上了',
+          '同一個 email 之前就登記過 —— 不當作錯誤,模板連結照樣再給你一次:', body.gift);
+      } else {
+        show('ok', '完成,Email 已登記',
+          '這是說好的 30 天行動追蹤模板 —— 當場兌現,不用等信:', body.gift);
+      }
+    } else {
+      show('err', '沒有成功', describeError(resp.status, body));
+    }
+  } catch (err) {
+    const fileHint = location.protocol === 'file:'
+      ? '你正用 file:// 直開,瀏覽器以 null origin 發請求,Worker 的 CORS 白名單不放行 —— 請改用 python3 -m http.server 在 localhost 開這頁。'
+      : '連不上 Worker:檢查網路、確認上面的端點網址正確(結尾是 /signup),或是 Worker 還沒部署。';
+    show('err', '請求送不出去', fileHint);
+    rawResp.textContent = String(err);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = label;
+  }
+});
+</script>
+</body>
+</html>

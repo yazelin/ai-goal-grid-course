@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/</loc><priority>1.0</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/app/</loc><priority>1.0</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/slides/</loc><priority>0.8</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/</loc><priority>0.7</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/01-grid-ui/</loc><priority>0.6</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/02-ai-fill/</loc><priority>0.6</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/03-wallpaper/</loc><priority>0.6</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/04-quota/</loc><priority>0.6</priority></url>
+  <url><loc>https://yazelin.github.io/ai-goal-grid-course/demos/05-email/</loc><priority>0.6</priority></url>
+</urlset>

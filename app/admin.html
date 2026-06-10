@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名單後台 — 目標九宮格</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230e1420'/%3E%3Crect x='6.5' y='6.5' width='3' height='3' rx='.8' fill='%23c9a44e'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0e1420; --bg-deep: #0a0f18;
+    --panel: rgba(20, 28, 44, 0.55); --panel-2: rgba(13, 18, 29, 0.72);
+    --line-cool: rgba(140, 156, 184, 0.16); --line-gold: rgba(201, 164, 78, 0.28);
+    --gold: #c9a44e; --gold-bright: #e7c87e;
+    --ink: #e9e6da; --ink-dim: #aab3c5; --muted: #76819a;
+    --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.75;
+    color: var(--ink);
+    background: radial-gradient(1100px 700px at 72% -8%, rgba(56, 80, 130, 0.32), transparent 62%), var(--bg);
+    min-height: 100vh;
+    padding: 6vh 6vw 10vh;
+  }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px; margin-bottom: 26px; }
+  .kicker { font-size: 11.5px; letter-spacing: 0.34em; color: var(--gold); }
+  h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(1.4rem, 3.2vw, 2rem); letter-spacing: 0.05em; }
+
+  .gate {
+    width: min(30rem, 100%);
+    background: var(--panel); border: 1px solid var(--line-cool); border-radius: 16px;
+    padding: 26px 24px;
+    backdrop-filter: blur(6px);
+  }
+  .gate label { display: block; font-size: 12px; letter-spacing: 0.16em; color: var(--gold); margin-bottom: 8px; }
+  .gate input {
+    width: 100%;
+    font-family: var(--sans); font-size: 14.5px; color: var(--ink);
+    background: rgba(8, 12, 20, 0.62);
+    border: 1px solid var(--line-cool); border-radius: 10px;
+    padding: 0.72rem 0.95rem; outline: none;
+  }
+  .gate input:focus { border-color: var(--gold); }
+  .gate .note { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin-top: 10px; }
+
+  button {
+    cursor: pointer;
+    font-family: var(--sans); font-size: 14px; font-weight: 700; letter-spacing: 0.06em;
+    border-radius: 999px; padding: 0.66rem 1.4rem;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-go {
+    background: linear-gradient(135deg, #dcb766, #b8923f);
+    border: 1px solid rgba(231, 200, 126, 0.55);
+    color: #1a1408;
+  }
+  .btn-go:hover { box-shadow: 0 8px 24px rgba(201, 164, 78, 0.28); }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-cool); color: var(--ink-dim); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold-bright); }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .count { color: var(--ink-dim); font-size: 13.5px; letter-spacing: 0.06em; margin-left: auto; }
+
+  .msg { font-size: 13.5px; line-height: 1.7; margin: 14px 0; color: var(--ink-dim); }
+  .msg.err { color: #e0a294; }
+
+  .twrap { overflow-x: auto; border: 1px solid var(--line-cool); border-radius: 12px; background: var(--panel-2); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--line-cool); line-height: 1.6; }
+  th {
+    color: var(--gold); font-weight: 700; letter-spacing: 0.08em; font-size: 12px;
+    position: sticky; top: 0; background: var(--bg-deep);
+  }
+  td { color: var(--ink); }
+  td .dim { color: var(--muted); }
+  tr:hover td { background: rgba(201, 164, 78, 0.05); }
+  .hide { display: none; }
+
+  footer { margin-top: 40px; font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  footer a { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <span class="kicker">ADMIN</span>
+  <h1>目標九宮格 — 名單後台</h1>
+</div>
+
+<div class="gate" id="gate">
+  <label for="token">管理密碼(Worker 的 ADMIN_TOKEN)</label>
+  <input id="token" type="password" placeholder="輸入後按下方讀取" autocomplete="off">
+  <p class="note">密碼存在 Worker 的 Secret 裡,不在這個網頁的程式碼。輸入正確才看得到名單;只記到這個分頁關閉為止(sessionStorage),重開要再輸一次。</p>
+  <button class="btn-go" id="login" style="margin-top:14px; width:100%">讀取名單</button>
+  <p class="msg err hide" id="gateErr"></p>
+</div>
+
+<section id="panel" class="hide">
+  <div class="bar">
+    <button class="btn-go" id="refresh">重新整理</button>
+    <button class="btn-ghost" id="csv">匯出 CSV</button>
+    <button class="btn-ghost" id="logout">登出</button>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="twrap">
+    <table>
+      <thead><tr><th>#</th><th>Email</th><th>稱呼</th><th>時間</th><th>IP</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="msg" id="panelMsg"></p>
+</section>
+
+<footer>目標九宮格 GOAL GRID · 本頁僅供站方管理名單 · <a href="index.html">回 App</a></footer>
+
+<script>
+/* 名單後台:憑 token 跟 Worker 拿名單(GET /list,Authorization: Bearer)。
+   API base 規則與 app 的 api.js 一致:預設 goal-grid Worker,
+   localStorage 'goal-grid-worker-url' 可 override(自部署時換成自己的)。
+   token 存 sessionStorage(R7):yazelin.github.io 是多專案共用 origin,
+   localStorage 持久化會放大其他專案 XSS 的爆炸半徑;分頁關閉即失效。 */
+const DEFAULT_WORKER_URL = 'https://goal-grid.yazelinj303.workers.dev';
+const TOKEN_KEY = 'goal-grid-admin-token';
+const $ = (id) => document.getElementById(id);
+let list = [];
+
+function apiBase() {
+  const v = (localStorage.getItem('goal-grid-worker-url') || '').trim().replace(/\/+$/, '');
+  return v || DEFAULT_WORKER_URL;
+}
+
+function savedToken() { return sessionStorage.getItem(TOKEN_KEY) || ''; }
+
+async function load() {
+  const t = $('token').value.trim() || savedToken();
+  if (!t) return fail($('gateErr'), '請先輸入管理密碼');
+  try {
+    // token 走 Authorization 標頭,不放進網址(避免被瀏覽器歷史 / CDN log 記下)
+    const r = await fetch(apiBase() + '/list', { headers: { Authorization: 'Bearer ' + t } });
+    if (r.status === 401) {
+      sessionStorage.removeItem(TOKEN_KEY);
+      return fail($('gateErr'), '密碼不對');
+    }
+    if (!r.ok) return fail($('gateErr'), '讀取失敗(' + r.status + ')');
+    list = (await r.json()).signups || [];
+    sessionStorage.setItem(TOKEN_KEY, t);
+    $('gate').classList.add('hide');
+    $('panel').classList.remove('hide');
+    render();
+  } catch {
+    fail($('gateErr'), '連不上伺服器');
+  }
+}
+
+function render() {
+  const rows = $('rows');
+  rows.textContent = '';
+  list.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="dim">' + (i + 1) + '</td><td>' + esc(s.email) + '</td>'
+      + '<td>' + (s.name ? esc(s.name) : '<span class="dim">—</span>') + '</td>'
+      + '<td class="dim">' + esc(s.created_at) + '</td>'
+      + '<td class="dim">' + esc(s.ip) + '</td>';
+    rows.appendChild(tr);
+  });
+  $('count').textContent = list.length + ' 筆名單';
+  $('panelMsg').textContent = list.length ? '' : '名單還是空的 —— 去 App 步驟五填一筆再回來看。';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+}
+
+function fail(el, t) {
+  el.textContent = t;
+  el.classList.remove('hide');
+}
+
+/* CSV(RFC 4180):每個欄位都加雙引號、引號翻倍跳脫、列尾 CRLF */
+function buildCsv(items) {
+  const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['email', 'name', 'created_at', 'ip']]
+    .concat(items.map((s) => [s.email, s.name || '', s.created_at, s.ip || '']));
+  return rows.map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';
+}
+
+function exportCsv() {
+  // 開頭加 UTF-8 BOM:讓 Excel 直接開啟時正確識別中文
+  const blob = new Blob(['\uFEFF' + buildCsv(list)], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'goal-grid-signups.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$('login').onclick = load;
+$('token').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+$('refresh').onclick = load;
+$('csv').onclick = exportCsv;
+$('logout').onclick = () => { sessionStorage.removeItem(TOKEN_KEY); location.reload(); };
+
+/* 已存過 token 就直接嘗試載入 */
+if (savedToken()) load();
+</script>
+</body>
+</html>

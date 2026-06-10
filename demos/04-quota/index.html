@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo 04 — 防刷與額度模擬|目標九宮格</title>
+<meta name="description" content="目標九宮格課程 demo 04:每日配額 + in-flight lock + 先扣後跑 + 失敗退款的互動模擬,以及四層防線圖解。對應課程第 08 章。">
+<style>
+/* ---- 夜空製圖室主題(與 app/ 同款,單檔內嵌精簡版)---- */
+:root {
+  --bg: #0e1420;
+  --bg-deep: #0a0f18;
+  --panel: rgba(20, 28, 44, 0.55);
+  --panel-2: rgba(13, 18, 29, 0.72);
+  --line-gold: rgba(201, 164, 78, 0.28);
+  --line-gold-soft: rgba(201, 164, 78, 0.14);
+  --line-cool: rgba(140, 156, 184, 0.16);
+  --gold: #c9a44e;
+  --gold-bright: #e7c87e;
+  --gold-deep: #8a6c2c;
+  --ink: #e9e6da;
+  --ink-dim: #aab3c5;
+  --muted: #76819a;
+  --ok: #8be29b;
+  --bad: #ff7a8a;
+  --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+  --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 700px at 72% -8%, rgba(56, 80, 130, 0.32), transparent 62%),
+    radial-gradient(900px 600px at 8% 108%, rgba(201, 164, 78, 0.07), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 31px 47px, rgba(233, 230, 218, 0.40) 50%, transparent 51%),
+    radial-gradient(1px 1px at 173px 113px, rgba(233, 230, 218, 0.22) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 97px 191px, rgba(201, 164, 78, 0.30) 50%, transparent 51%),
+    radial-gradient(1px 1px at 229px 23px, rgba(233, 230, 218, 0.28) 50%, transparent 51%);
+  background-size: 260px 230px;
+  opacity: 0.5;
+}
+.wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 26px 20px 60px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 28px; }
+.brand-name { font-family: var(--serif); font-size: 19px; font-weight: 700; letter-spacing: 0.12em; }
+.brand-tag { font-size: 11px; letter-spacing: 0.3em; color: var(--gold); opacity: 0.8; }
+.kicker { font-size: 12px; letter-spacing: 0.32em; color: var(--gold); margin-bottom: 10px; }
+h1 { font-family: var(--serif); font-size: clamp(1.6rem, 5.4vw, 2.4rem); line-height: 1.35; margin-bottom: 12px; }
+.lede { color: var(--ink-dim); max-width: 640px; margin-bottom: 34px; }
+h2 { font-family: var(--serif); font-size: 1.25rem; margin-bottom: 14px; color: var(--gold-bright); }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line-gold-soft);
+  border-radius: 12px;
+  padding: 24px 22px;
+  margin-bottom: 26px;
+  backdrop-filter: blur(4px);
+}
+.hint { font-size: 13px; color: var(--muted); }
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.88em;
+  background: rgba(201, 164, 78, 0.10);
+  border-radius: 4px; padding: 1px 6px;
+  color: var(--gold-bright);
+}
+pre {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+pre code { background: none; padding: 0; color: var(--ink-dim); }
+
+/* 配額儀表 */
+.meter { display: flex; align-items: center; gap: 14px; margin: 14px 0; flex-wrap: wrap; }
+.slots { display: flex; gap: 8px; }
+.slot {
+  width: 44px; height: 12px; border-radius: 6px;
+  border: 1px solid var(--line-gold);
+  background: rgba(201, 164, 78, 0.06);
+  transition: background 0.3s;
+}
+.slot.used { background: var(--gold); border-color: var(--gold); }
+.slot.refunded { background: rgba(139, 226, 155, 0.45); border-color: var(--ok); }
+.meter-label { font-size: 13.5px; color: var(--ink-dim); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
+.btn {
+  font-family: var(--sans); font-size: 13.5px; letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  background: none;
+  border: 1px solid var(--line-gold);
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn:hover { border-color: var(--gold); background: rgba(201, 164, 78, 0.08); }
+.btn-primary { background: var(--gold); color: #141a26; font-weight: 700; border-color: var(--gold); }
+.btn-primary:hover { background: var(--gold-bright); }
+.btn-ghost { border-color: var(--line-cool); color: var(--muted); }
+
+/* 流程日誌 */
+.log {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-cool);
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-height: 120px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.log .t { color: var(--muted); margin-right: 8px; }
+.log .ok { color: var(--ok); }
+.log .bad { color: var(--bad); }
+.log .gold { color: var(--gold-bright); }
+.log p { margin: 0; }
+
+/* 429 面板 */
+.quota-out {
+  border: 1px solid rgba(255, 122, 138, 0.4);
+  background: rgba(255, 122, 138, 0.07);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 14px;
+  font-size: 14px;
+}
+.quota-out b { color: var(--bad); }
+
+/* 四層防線圖解 */
+.layers { display: flex; flex-direction: column; gap: 0; margin: 18px 0 6px; }
+.layer {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 14px;
+  align-items: start;
+  background: var(--panel-2);
+  border: 1px solid var(--line-cool);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.layer-num {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  font-family: var(--serif); font-size: 16px;
+  color: var(--gold-bright);
+  border: 1px solid var(--line-gold);
+  border-radius: 50%;
+}
+.layer h3 { font-family: var(--serif); font-size: 15.5px; margin-bottom: 2px; }
+.layer p { font-size: 13.5px; color: var(--ink-dim); }
+.layer .blocks { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.layer .blocks b { color: var(--gold); font-weight: 600; }
+.layer-arrow {
+  text-align: center;
+  color: var(--gold-deep);
+  font-size: 16px;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+.callout {
+  border-left: 3px solid var(--gold);
+  background: rgba(201, 164, 78, 0.06);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 13.5px; color: var(--ink-dim);
+  margin-top: 14px;
+}
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line-cool); font-size: 13px; color: var(--muted); }
+footer a { color: var(--gold); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <span class="brand-name">目標九宮格</span>
+    <span class="brand-tag">DEMO 04</span>
+  </header>
+
+  <p class="kicker">課程第 08 章 — 防刷與額度</p>
+  <h1>四層防線:配額、鎖、先扣後跑</h1>
+  <p class="lede">
+    生圖一次燒 70-180 秒的真實算力,免費開放就一定有人刷。
+    這頁把完整版 Worker 的配額邏輯搬到前端「模擬」一遍 ——
+    按下生成,親眼看一次請求怎麼被扣額、上鎖、失敗退款、最後撞上 429。
+    全程不打真 Worker,刷再多次也不花任何人的錢。
+  </p>
+
+  <section class="panel">
+    <h2>一、動手刷刷看(每日 3 次模擬配額)</h2>
+    <div class="meter">
+      <div class="slots" id="slots"></div>
+      <span class="meter-label" id="meterLabel"></span>
+    </div>
+    <div class="controls">
+      <button type="button" class="btn btn-primary" id="genBtn">生成桌布(模擬)</button>
+      <button type="button" class="btn btn-ghost" id="resetBtn">重設模擬</button>
+      <span class="hint">真實版生成要 70-180 秒,這裡縮成約 3 秒;成功或失敗是隨機的。</span>
+    </div>
+    <div class="log" id="log"><p class="hint">按「生成桌布」開始 —— 流程的每一步都會印在這裡。</p></div>
+    <div class="quota-out" id="quotaOut" hidden>
+      <b>429 quota_exceeded</b> — 今天的免費生成次數(3 次)用完了。<br>
+      額度將於 <span id="resetAt"></span>(台北時間明日 00:00)重置。
+      完整版在這裡會再給一條出路:自帶 API key(BYO)或把生圖 prompt 複製出去自己生。<br>
+      <span class="hint">「重設模擬」只能清這頁的 localStorage 計數;真實版計數在伺服器端 D1,使用者清不掉 —— 這正是配額要放後端的原因。</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>二、四層防線圖解</h2>
+    <p class="hint">一個 /image 請求要連過四關才碰得到生圖服務。每一層擋的東西不同,缺一不可。</p>
+    <div class="layers">
+      <div class="layer">
+        <span class="layer-num">1</span>
+        <div>
+          <h3>Turnstile 無感人機驗證</h3>
+          <p>每次請求帶一個一次性 token,Worker 向 Cloudflare 驗真假。使用者多半無感,不用點紅綠燈。</p>
+          <p class="blocks">擋住:<b>純腳本批量請求</b>(沒有真瀏覽器就拿不到 token)</p>
+        </div>
+      </div>
+      <div class="layer-arrow">|</div>
+      <div class="layer">
+        <span class="layer-num">2</span>
+        <div>
+          <h3>每日配額(每 IP 生圖 3 次)</h3>
+          <p>以「台北日 + IP + 種類」記一筆計數,超過就回 <code>429</code> 和重置時間。數字放 Worker 環境變數,可隨時調。</p>
+          <p class="blocks">擋住:<b>單一來源重度使用</b>(就算是真人,免費額度也有上限)</p>
+        </div>
+      </div>
+      <div class="layer-arrow">|</div>
+      <div class="layer">
+        <span class="layer-num">3</span>
+        <div>
+          <h3>in-flight lock(同 IP 一次一件)</h3>
+          <p>生圖要跑一到三分鐘,期間同 IP 再送就回 <code>409</code>。鎖設 900 秒自動過期,卡住也會自己解開。</p>
+          <p class="blocks">擋住:<b>並發轟炸</b>(開十個分頁同時按生成,只有一個進得去)</p>
+        </div>
+      </div>
+      <div class="layer-arrow">|</div>
+      <div class="layer">
+        <span class="layer-num">4</span>
+        <div>
+          <h3>先扣後跑 + 失敗退款</h3>
+          <p>額度<b>先扣再呼叫上游</b> —— 如果先跑再扣,請求還在路上時額度看起來沒少,並發就能繞過上限。確定失敗(上游回錯、逾時)由 Worker 退還,退款有冪等保護,同一件失敗退兩次也只還一次。</p>
+          <p class="blocks">擋住:<b>扣款時間差攻擊</b>;同時對真實失敗保持公平</p>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      為什麼計數不放 Workers KV?KV 沒有原子加一:兩個並發請求同時讀到 2、各自寫回 3,配額就被繞過了。
+      換成 D1 一條 <code>INSERT ... ON CONFLICT DO UPDATE SET count = count + 1 WHERE count &lt; 上限 RETURNING count</code>,
+      「讀、判斷、寫」變成資料庫裡的一步原子操作,沒有 row 回來就是超限。
+    </div>
+    <pre><code>-- 完整版 Worker 的扣額 SQL(D1,原子的先扣後跑)
+INSERT INTO quota_counts (day, ip, kind, count) VALUES (?, ?, ?, 1)
+ON CONFLICT(day, ip, kind) DO UPDATE SET count = count + 1
+WHERE count &lt; ?    -- 超限時 UPDATE 不發生,RETURNING 無 row → 回 429
+RETURNING count;</code></pre>
+  </section>
+
+  <footer>
+    <p>↑ 完整版:<a href="../../app/">../../app/</a>(真實四層防線跑在 Cloudflare Worker + D1 上)</p>
+    <p>AI 互動行銷頁實戰 — 目標九宮格.方法淵源:原田メソッド(目標達成シート);「マンダラチャート」為他人註冊商標,本課程與其無關。</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+// ============ 模擬參數(與完整版 Worker 的 IMG_PER_DAY=3 對齊)============
+const LIMIT = 3;
+const KEY = 'goal-grid-demo04-quota'; // {day, count} —— 真實版這筆在 D1,不在使用者手上
+const FAIL_RATE = 0.4;                // 隨機失敗率,讓「退款」路徑容易看到
+
+// 台北日(UTC+8,無日光節約)—— 與 Worker 的 taipeiDay() 同一套算法
+function taipeiDay(now = new Date()) {
+  const shifted = new Date(now.getTime() + 8 * 3600 * 1000);
+  return shifted.toISOString().slice(0, 10).replace(/-/g, '');
+}
+// 台北明日 00:00 的時刻(429 的 resetAt)
+function taipeiResetAt(now = new Date()) {
+  const shifted = new Date(now.getTime() + 8 * 3600 * 1000);
+  const nextMidnight = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1);
+  return new Date(nextMidnight - 8 * 3600 * 1000);
+}
+
+// ============ 模擬狀態 ============
+function loadQuota() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY));
+    if (raw && raw.day === taipeiDay() && Number.isInteger(raw.count)) {
+      return raw;
+    }
+  } catch { /* 壞資料當沒有 */ }
+  return { day: taipeiDay(), count: 0 }; // 跨日自動歸零 —— 跟 D1 的 day 鍵同理
+}
+function saveQuota(q) {
+  try { localStorage.setItem(KEY, JSON.stringify(q)); } catch { /* 略過 */ }
+}
+let quota = loadQuota();
+let inFlight = false;   // in-flight lock(真實版是 D1 locks 表,TTL 900s)
+let lastRefunded = false;
+
+// ============ UI ============
+const slotsEl = document.getElementById('slots');
+const meterLabel = document.getElementById('meterLabel');
+const logEl = document.getElementById('log');
+const genBtn = document.getElementById('genBtn');
+const quotaOut = document.getElementById('quotaOut');
+
+function renderMeter() {
+  slotsEl.innerHTML = '';
+  for (let i = 0; i < LIMIT; i++) {
+    const s = document.createElement('span');
+    s.className = 'slot' + (i < quota.count ? ' used' : '');
+    slotsEl.appendChild(s);
+  }
+  meterLabel.textContent = `今日已用 ${quota.count} / ${LIMIT} 次(模擬,記在這頁的 localStorage)`;
+  const out = quota.count >= LIMIT && !inFlight;
+  quotaOut.hidden = !out;
+  if (out) {
+    document.getElementById('resetAt').textContent =
+      taipeiResetAt().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+  }
+}
+
+let firstLog = true;
+function log(html, cls = '') {
+  if (firstLog) { logEl.innerHTML = ''; firstLog = false; }
+  const p = document.createElement('p');
+  const t = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+  p.innerHTML = `<span class="t">${t}</span>` + (cls ? `<span class="${cls}">${html}</span>` : html);
+  logEl.appendChild(p);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ============ 一次「生成」走完整防線流程 ============
+async function generate() {
+  // 第 3 層:in-flight lock —— 先檢查,真實版同 IP 撞鎖回 409
+  if (inFlight) {
+    log('409 in_flight — 同 IP 已有一件生成進行中,先等它跑完(真實版鎖最多 900 秒自動過期)', 'bad');
+    return;
+  }
+
+  log('— 新請求 —', 'gold');
+  // 第 1 層:Turnstile(模擬必過;真實版假 token 在這裡就被 403 退回)
+  await sleep(450);
+  log('第 1 層 Turnstile:token 驗證通過(模擬)');
+
+  // 上鎖
+  inFlight = true;
+  genBtn.textContent = '生成中…(再按一次試試撞鎖)';
+  await sleep(450);
+  log('第 3 層 in-flight lock:取得鎖,開始佔位');
+
+  // 第 2 層 + 第 4 層:先扣後跑 —— 額度先扣,再呼叫上游
+  quota = loadQuota(); // 重新讀,處理跨日
+  if (quota.count >= LIMIT) {
+    log(`第 2 層 配額:已達 ${LIMIT} 次上限 → <b>429 quota_exceeded</b>,附上明日 00:00(台北)重置時間`, 'bad');
+    inFlight = false;
+    genBtn.textContent = '生成桌布(模擬)';
+    renderMeter();
+    return;
+  }
+  quota.count += 1;
+  saveQuota(quota);
+  lastRefunded = false;
+  renderMeter();
+  log(`第 2、4 層 先扣後跑:額度先扣 1(今日第 ${quota.count}/${LIMIT} 次),<i>然後</i>才呼叫上游`);
+
+  // 模擬上游生圖(真實版 70-180 秒,這裡 2.5 秒)
+  await sleep(600);
+  log('呼叫生圖服務,排入 job queue…');
+  await sleep(2500);
+
+  if (Math.random() < FAIL_RATE) {
+    // 失敗 → 退款(冪等)+ 解鎖
+    log('上游回報失敗(502)→ Worker 自動退款 + 解鎖', 'bad');
+    quota.count = Math.max(0, quota.count - 1);
+    saveQuota(quota);
+    lastRefunded = true;
+    log('退款冪等保護:這筆 job 標記 refunded=1,之後再怎麼重複觸發退款也不會再減第二次', 'ok');
+  } else {
+    log('生成成功,釋放 in-flight lock。額度不退 —— 服務真的被用掉了', 'ok');
+  }
+
+  inFlight = false;
+  genBtn.textContent = '生成桌布(模擬)';
+  renderMeter();
+  // 失敗退款的格子閃一下綠,讓「退回來了」看得見
+  if (lastRefunded) {
+    const slot = slotsEl.children[quota.count];
+    if (slot) {
+      slot.classList.add('refunded');
+      setTimeout(() => slot.classList.remove('refunded'), 1600);
+    }
+  }
+}
+
+genBtn.addEventListener('click', generate);
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  quota = { day: taipeiDay(), count: 0 };
+  saveQuota(quota);
+  renderMeter();
+  log('已重設模擬計數。再提醒一次:真實版的計數在伺服器端 D1,沒有這顆按鈕', 'gold');
+});
+
+renderMeter();
+</script>
+</body>
+</html>

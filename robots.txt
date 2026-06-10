@@ -1,0 +1,7 @@
+# https://yazelin.github.io/ai-goal-grid-course/
+# GitHub Pages 子路徑無法提供站根 robots.txt;真正的站根檔案由
+# yazelin.github.io 主 repo 管理。本檔供文件與爬蟲參考。
+User-agent: *
+Allow: /
+
+Sitemap: https://yazelin.github.io/ai-goal-grid-course/sitemap.xml

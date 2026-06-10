@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo 02:AI 補滿空格 — 目標九宮格課程</title>
+<meta name="description" content="課程第 03 章成果:九宮格留空的格子,一鍵交給 Groq LLM 補滿;只填空格、不動手填內容。">
+<style>
+  /* ============ 夜空製圖室主題(同 Demo 01) ============ */
+  :root {
+    --bg: #0e1420;
+    --gold: #c9a44e;
+    --gold-bright: #e7c87e;
+    --line-gold: rgba(201, 164, 78, 0.28);
+    --line-cool: rgba(140, 156, 184, 0.16);
+    --ink: #e9e6da;
+    --muted: #76819a;
+    --err: #e0a294;          /* 錯誤文案 */
+    --ok: #a9cba4;           /* 成功文案 */
+    --serif: "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 600px at 75% -10%, rgba(56, 80, 130, 0.30), transparent 60%),
+      radial-gradient(700px 500px at 5% 110%, rgba(201, 164, 78, 0.07), transparent 60%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 60px; }
+
+  .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--gold); margin-bottom: 10px; }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.7rem, 6vw, 2.4rem);
+    font-weight: 700; letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .lead { color: var(--muted); margin-bottom: 28px; }
+
+  /* ============ 3×3 九宮格(同 Demo 01) ============ */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .cell {
+    position: relative;
+    border: 1px solid var(--line-cool);
+    border-radius: 12px;
+    background: rgba(8, 12, 20, 0.62);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .cell:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201, 164, 78, 0.14); }
+  .cell-core { border-color: var(--line-gold); box-shadow: inset 0 0 26px rgba(201, 164, 78, 0.08); }
+  .cell-core:focus-within {
+    border-color: var(--gold-bright);
+    box-shadow: inset 0 0 26px rgba(201, 164, 78, 0.10), 0 0 0 3px rgba(201, 164, 78, 0.18);
+  }
+  .cell-core textarea { font-weight: 700; }
+  .cell-tag {
+    position: absolute; top: 7px; left: 0; right: 0;
+    text-align: center;
+    font-size: 10px; letter-spacing: 0.28em; text-indent: 0.28em;
+    color: var(--gold);
+    pointer-events: none;
+  }
+  .cell textarea {
+    display: block; width: 100%;
+    min-height: 96px;
+    background: transparent; border: 0; outline: none; resize: none;
+    color: var(--ink);
+    font-family: var(--sans); font-size: 14px; line-height: 1.55;
+    text-align: center;
+    padding: 1.45rem 0.5rem 0.6rem;
+  }
+  .cell textarea::placeholder { color: var(--muted); opacity: 0.75; }
+
+  /* ============ 本章新增:AI 來源格的標記 ============ */
+  .cell.is-ai {
+    border-color: var(--line-gold);                 /* 淡金邊 = 這格是 AI 補的 */
+    box-shadow: inset 0 0 18px rgba(201, 164, 78, 0.07);
+  }
+  .ai-badge {
+    position: absolute; top: 6px; right: 8px;
+    font-size: 9px; letter-spacing: 0.18em; text-indent: 0.18em;
+    padding: 2px 7px; border-radius: 999px;
+    color: var(--gold-bright);
+    border: 1px solid var(--line-gold);
+    background: rgba(201, 164, 78, 0.10);
+    pointer-events: none;
+  }
+
+  /* ============ 工具列、狀態文案 ============ */
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
+  button {
+    font-family: var(--sans); font-size: 13.5px;
+    color: var(--gold-bright);
+    background: rgba(201, 164, 78, 0.08);
+    border: 1px solid var(--line-gold);
+    border-radius: 999px;
+    padding: 0.55rem 1.4rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+  }
+  button:hover { background: rgba(201, 164, 78, 0.16); border-color: var(--gold); }
+  button:disabled { opacity: 0.45; cursor: wait; }
+  button.primary { background: rgba(201, 164, 78, 0.18); border-color: var(--gold); }
+  .status { font-size: 13.5px; line-height: 1.7; margin-top: 14px; min-height: 1.7em; }
+  .status.is-err { color: var(--err); }
+  .status.is-ok { color: var(--ok); }
+  .status.is-busy { color: var(--gold-bright); }
+
+  /* ============ Groq key 設定面板 ============ */
+  details.key-panel {
+    margin-top: 30px;
+    border: 1px solid var(--line-cool);
+    border-radius: 12px;
+    background: rgba(13, 18, 29, 0.72);
+    padding: 14px 16px;
+  }
+  details.key-panel summary {
+    cursor: pointer;
+    font-size: 13.5px; letter-spacing: 0.06em;
+    color: var(--gold);
+  }
+  .key-body { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .key-body a { color: var(--gold); text-decoration: none; }
+  .key-body a:hover { color: var(--gold-bright); text-decoration: underline; }
+  .key-row { display: flex; gap: 8px; margin-top: 10px; }
+  .key-row input {
+    flex: 1;
+    font-family: var(--sans); font-size: 13px;
+    color: var(--ink);
+    background: rgba(8, 12, 20, 0.62);
+    border: 1px solid var(--line-cool);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    outline: none;
+  }
+  .key-row input:focus { border-color: var(--gold); }
+  .key-note { margin-top: 10px; font-size: 12.5px; }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-cool);
+    font-size: 12.5px; color: var(--muted);
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { color: var(--gold-bright); text-decoration: underline; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <p class="kicker">目標九宮格課程 · DEMO 02(對應第 03 章)</p>
+    <h1>AI 補滿空格</h1>
+    <p class="lead">
+      Demo 01 的九宮格,加上一顆「AI 補滿空格」按鈕:
+      留空的格子交給 LLM,已填的格子一字不動。
+      AI 補的格子會掛上金色標記,改字後標記消失(它就變成你的了)。
+    </p>
+  </header>
+
+  <section class="grid3" id="grid" aria-label="目標九宮格"></section>
+
+  <div class="toolbar">
+    <button type="button" id="fillBtn" class="primary">AI 補滿空格</button>
+    <button type="button" id="clearBtn">清空九宮格</button>
+  </div>
+  <p class="status" id="statusMsg" role="status"></p>
+
+  <details class="key-panel" id="keyPanel">
+    <summary>Groq API Key 設定(第一次使用必填)</summary>
+    <div class="key-body">
+      <p>
+        本 demo 由瀏覽器直連 Groq 的 LLM API。先到
+        <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>
+        免費註冊,在「API Keys」建立一把 key(gsk_ 開頭),貼到下面。
+      </p>
+      <div class="key-row">
+        <input type="password" id="keyInput" placeholder="gsk_..." autocomplete="off">
+        <button type="button" id="saveKeyBtn">儲存</button>
+      </div>
+      <p class="key-note" id="keyStatus"></p>
+      <p class="key-note">
+        Key 只存在你瀏覽器的 localStorage,本頁沒有任何伺服器。
+        但「前端直連」表示 key 攤在瀏覽器裡 —— 只適合自用練習;
+        正式版會把 key 收進 Cloudflare Worker,瀏覽器永遠看不到(第 03 章的重點)。
+      </p>
+    </div>
+  </details>
+
+  <footer>
+    <p>完整版:<a href="../../app/">../../app/</a>(五步精靈 + AI 補格 + 桌布生成)</p>
+    <p>方法源自原田隆史「原田メソッド」;大谷翔平高中時期的目標達成表是最著名的案例。</p>
+  </footer>
+</main>
+
+<script>
+// ============ 常數 ============
+const STORAGE_KEY = 'goal-grid-demo-02';            // {cells:[9 字串], ai:[9 布林]}
+const GROQ_KEY_STORAGE = 'goal-grid-demo-02-groq-key';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'openai/gpt-oss-120b';           // JSON 結構化輸出可靠的免費模型
+const CORE_INDEX = 4;
+
+// ============ 狀態:cells = 9 格文字,ai = 哪幾格是 AI 補的 ============
+function loadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (raw && Array.isArray(raw.cells) && raw.cells.length === 9) {
+      return {
+        cells: raw.cells.map((c) => (typeof c === 'string' ? c : '')),
+        ai: Array.from({ length: 9 }, (_, i) => raw.ai?.[i] === true),
+      };
+    }
+  } catch (err) {
+    console.warn('儲存的資料壞掉了,回到空白九宮格', err);
+  }
+  return { cells: Array(9).fill(''), ai: Array(9).fill(false) };
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+const state = loadState();
+
+// ============ 九宮格 UI(同 Demo 01,多了 AI 標記) ============
+const badges = [];   // badges[i] = 第 i 格的 AI 徽章元素,補完後好開關
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.className = i === CORE_INDEX ? 'cell cell-core' : 'cell';
+    if (state.ai[i]) cell.classList.add('is-ai');
+
+    if (i === CORE_INDEX) {
+      const tag = document.createElement('span');
+      tag.className = 'cell-tag';
+      tag.textContent = '核心目標';
+      cell.appendChild(tag);
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'ai-badge';
+    badge.textContent = 'AI';
+    badge.hidden = !state.ai[i];
+    cell.appendChild(badge);
+    badges[i] = badge;
+
+    const box = document.createElement('textarea');
+    box.dataset.idx = String(i);
+    box.name = `cell-${i}`;
+    box.rows = 2;
+    box.placeholder = i === CORE_INDEX ? '寫下核心目標' : '留給 AI';
+    box.setAttribute('aria-label', i === CORE_INDEX ? '核心目標' : `子目標(位置 ${i})`);
+    box.value = state.cells[i];
+
+    box.addEventListener('input', () => {
+      state.cells[i] = box.value;
+      // 人改過字,這格就不再算 AI 的:拿掉標記
+      state.ai[i] = false;
+      badge.hidden = true;
+      cell.classList.remove('is-ai');
+      saveState(state);
+    });
+
+    cell.appendChild(box);
+    grid.appendChild(cell);
+  }
+}
+
+function setCellFromAI(i, text) {
+  state.cells[i] = text;
+  state.ai[i] = true;
+  const box = document.querySelector(`#grid textarea[data-idx="${i}"]`);
+  box.value = text;
+  badges[i].hidden = false;
+  box.parentElement.classList.add('is-ai');
+}
+
+// ============ Prompt:把九宮格現況講給 LLM 聽 ============
+// 完整版的 prompt 在 app/js/prompts.js,這裡是教學用精簡版,精神相同:
+// 1. 講清楚格局(中央 = 核心目標) 2. 列出已填內容 3. 規則 + 只輸出 JSON。
+function buildPrompt(cells) {
+  const goal = cells[CORE_INDEX]
+    ? `核心目標:「${cells[CORE_INDEX]}」`
+    : '核心目標也留空,請先推斷一個具體可衡量的核心目標';
+  const filledLines = cells
+    .map((c, i) => (c && i !== CORE_INDEX ? `位置${i}:「${c}」` : null))
+    .filter(Boolean)
+    .join('\n') || '(其餘全空)';
+  return `你是目標設定教練,使用「九宮格目標法」(大谷翔平用過的目標達成表的方法)。
+使用者的 3×3 九宮格:中央(位置4)是核心目標,周圍 8 格(位置0-3、5-8)是支撐核心目標的子目標。
+${goal}
+已填的格子:
+${filledLines}
+請補滿所有空格。規則:
+1. 子目標要具體、彼此不重複、共同支撐核心目標。
+2. 每格 2-8 個字,繁體中文(台灣用語),不用標點結尾,不用 emoji。
+3. 已填的格子原樣保留,一字不改。
+只輸出 JSON:{"cells":["位置0文字","位置1文字",...,"位置8文字"]},長度必為 9。`;
+}
+
+// 防禦性解析:json_object 模式下通常直接是 JSON,
+// 但 LLM 偶爾還是會包 ```json 圍欄,兩種都接。
+function parseJsonLoose(text) {
+  try { return JSON.parse(text); } catch { /* 試下一招 */ }
+  const fenced = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/);
+  if (fenced) {
+    try { return JSON.parse(fenced[1]); } catch { /* 放棄 */ }
+  }
+  return null;
+}
+
+// ============ 狀態文案 ============
+function setStatus(text, kind) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = text;
+  el.className = 'status' + (kind ? ` is-${kind}` : '');
+}
+
+// ============ 主流程:AI 補滿空格 ============
+async function fillWithAI() {
+  const groqKey = (localStorage.getItem(GROQ_KEY_STORAGE) || '').trim();
+  if (!groqKey) {
+    document.getElementById('keyPanel').open = true;
+    setStatus('還沒設定 Groq API Key:先到下方面板貼上你的 key(免費申請見說明)。', 'err');
+    return;
+  }
+
+  // 收集現況:空白格用 null 表示「留給 AI」
+  const cells = state.cells.map((c) => (c.trim() ? c.trim() : null));
+  const emptyCount = cells.filter((c) => c === null).length;
+  if (emptyCount === 0) {
+    setStatus('九宮格已經滿了。想讓 AI 重想哪一格,先把那格清空再按一次。', 'err');
+    return;
+  }
+  if (emptyCount === 9) {
+    setStatus('至少先寫一格(建議中央核心目標),AI 補出來的才會像「你的」目標。', 'err');
+    return;
+  }
+
+  const fillBtn = document.getElementById('fillBtn');
+  fillBtn.disabled = true;
+  setStatus('AI 思考中…(通常 2-5 秒)', 'busy');
+
+  try {
+    // 瀏覽器直連 Groq:OpenAI 相容的 chat completions 端點
+    let res;
+    try {
+      res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: 'user', content: buildPrompt(cells) }],
+          response_format: { type: 'json_object' },   // 要求模型只回 JSON
+          max_tokens: 600,
+          temperature: 0.8,
+        }),
+      });
+    } catch {
+      setStatus('連不到 Groq:檢查一下網路,或公司防火牆是否擋了 api.groq.com 。', 'err');
+      return;
+    }
+
+    // 常見錯誤逐一給人話
+    if (res.status === 401) {
+      setStatus('Groq 不認得這把 key(401):確認貼的是 gsk_ 開頭的完整 key,必要時重新產生一把。', 'err');
+      return;
+    }
+    if (res.status === 429) {
+      setStatus('請求太頻繁或免費額度暫時用完(429):休息一兩分鐘再試,額度會自動回復。', 'err');
+      return;
+    }
+    if (!res.ok) {
+      setStatus(`Groq 回了 ${res.status} 錯誤,稍後再試一次。`, 'err');
+      return;
+    }
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content ?? '';
+    const parsed = parseJsonLoose(content);
+    const aiCells = Array.isArray(parsed?.cells) ? parsed.cells : null;
+    if (!aiCells || aiCells.length !== 9 || aiCells.some((c) => typeof c !== 'string' || !c.trim())) {
+      setStatus('AI 的回覆不是預期的 JSON 格式,再按一次通常就好(LLM 偶爾會恍神)。', 'err');
+      return;
+    }
+
+    // 只填空格:已填的格子不信任 AI 有照規則保留,一律以使用者原文為準
+    let filledByAI = 0;
+    for (let i = 0; i < 9; i++) {
+      if (cells[i] === null) {
+        setCellFromAI(i, aiCells[i].trim());
+        filledByAI++;
+      }
+    }
+    saveState(state);
+    setStatus(`AI 補了 ${filledByAI} 格。不滿意可以直接改字,或清空那格再按一次重抽。`, 'ok');
+  } finally {
+    fillBtn.disabled = false;
+  }
+}
+
+// ============ 清空 ============
+function clearGrid() {
+  if (!confirm('確定要清空整張九宮格?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state.cells = Array(9).fill('');
+  state.ai = Array(9).fill(false);
+  document.querySelectorAll('#grid .cell').forEach((cell, i) => {
+    cell.classList.remove('is-ai');
+    badges[i].hidden = true;
+    cell.querySelector('textarea').value = '';
+  });
+  setStatus('已清空。', null);
+}
+
+// ============ key 設定面板 ============
+function initKeyPanel() {
+  const input = document.getElementById('keyInput');
+  const status = document.getElementById('keyStatus');
+  const saved = localStorage.getItem(GROQ_KEY_STORAGE);
+  if (saved) {
+    input.value = saved;
+    status.textContent = '已儲存一把 key(只存在這台瀏覽器)。';
+  }
+  document.getElementById('saveKeyBtn').addEventListener('click', () => {
+    const key = input.value.trim();
+    if (!key) {
+      localStorage.removeItem(GROQ_KEY_STORAGE);
+      status.textContent = '已清除 key。';
+      return;
+    }
+    localStorage.setItem(GROQ_KEY_STORAGE, key);
+    status.textContent = key.startsWith('gsk_')
+      ? '已儲存,可以按「AI 補滿空格」了。'
+      : '已儲存 —— 不過 Groq 的 key 通常是 gsk_ 開頭,確認一下沒貼錯。';
+  });
+}
+
+buildGrid();
+initKeyPanel();
+document.getElementById('fillBtn').addEventListener('click', fillWithAI);
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+</script>
+</body>
+</html>
