@@ -300,6 +300,8 @@ async function groqJSON(groqKey, prompt, maxTokens, fetchFn) {
       response_format: { type: 'json_object' },
       max_tokens: maxTokens,
       temperature: 0.8,
+      // gpt-oss 是 reasoning 模型:推理吃 max_tokens,低預算配預設 effort 會被 400 拒
+      reasoning_effort: 'low',
     }),
   });
   if (!res.ok) throw new ApiError(res.status, body || { error: 'llm_failed' });
