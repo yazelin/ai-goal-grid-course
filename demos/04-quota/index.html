@@ -206,7 +206,7 @@ footer a:hover { text-decoration: underline; }
   </p>
 
   <section class="panel">
-    <h2>一、動手刷刷看(每日 3 次模擬配額)</h2>
+    <h2>一、動手刷刷看(每日 6 次模擬配額)</h2>
     <div class="meter">
       <div class="slots" id="slots"></div>
       <span class="meter-label" id="meterLabel"></span>
@@ -218,7 +218,7 @@ footer a:hover { text-decoration: underline; }
     </div>
     <div class="log" id="log"><p class="hint">按「生成桌布」開始 —— 流程的每一步都會印在這裡。</p></div>
     <div class="quota-out" id="quotaOut" hidden>
-      <b>429 quota_exceeded</b> — 今天的免費生成次數(3 次)用完了。<br>
+      <b>429 quota_exceeded</b> — 今天的免費生成次數(6 次)用完了。<br>
       額度將於 <span id="resetAt"></span>(台北時間明日 00:00)重置。
       完整版在這裡會再給一條出路:自帶 API key(BYO)或把生圖 prompt 複製出去自己生。<br>
       <span class="hint">「重設模擬」只能清這頁的 localStorage 計數;真實版計數在伺服器端 D1,使用者清不掉 —— 這正是配額要放後端的原因。</span>
@@ -241,7 +241,7 @@ footer a:hover { text-decoration: underline; }
       <div class="layer">
         <span class="layer-num">2</span>
         <div>
-          <h3>每日配額(每 IP 生圖 3 次)</h3>
+          <h3>每日配額(每 IP 生圖 6 次)</h3>
           <p>以「台北日 + IP + 種類」記一筆計數,超過就回 <code>429</code> 和重置時間。數字放 Worker 環境變數,可隨時調。</p>
           <p class="blocks">擋住:<b>單一來源重度使用</b>(就算是真人,免費額度也有上限)</p>
         </div>
@@ -285,8 +285,8 @@ RETURNING count;</code></pre>
 
 <script>
 'use strict';
-// ============ 模擬參數(與完整版 Worker 的 IMG_PER_DAY=3 對齊)============
-const LIMIT = 3;
+// ============ 模擬參數(與完整版 Worker 的 IMG_PER_DAY=6 對齊)============
+const LIMIT = 6;
 const KEY = 'goal-grid-demo04-quota'; // {day, count} —— 真實版這筆在 D1,不在使用者手上
 const FAIL_RATE = 0.4;                // 隨機失敗率,讓「退款」路徑容易看到
 

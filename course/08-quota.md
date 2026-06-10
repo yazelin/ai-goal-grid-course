@@ -19,7 +19,7 @@
 | 端點 | 燒什麼 | 每日配額(每 IP) |
 |---|---|---|
 | `POST /fill`(AI 補格/展開) | Groq API 額度 | 12 次 |
-| `POST /image`(AI 桌布背景) | OpenAI Images API(按張計費);備援自架服務燒 ChatGPT 訂閱 | 3 次 |
+| `POST /image`(AI 桌布背景) | OpenAI Images API(按張計費);備援自架服務燒 ChatGPT 訂閱 | 6 次 |
 | `POST /signup`(email 留資) | D1 寫入(便宜,但會被灌垃圾) | 10 次 |
 
 數字放在 `wrangler.toml` 的 `[vars]`(`IMG_PER_DAY`、`FILL_PER_DAY`),要調不用改程式。原則:最貴的資源配額壓最低。
@@ -176,7 +176,7 @@ jobs(id 主鍵, ip, day, refunded 預設 0, created_at)
 https://challenges.cloudflare.com/turnstile/v0/siteverify 驗證。
 Secret 名稱 TURNSTILE_SECRET;未設定時跳過驗證並 console.warn(部署過渡期 fail-open)。
 
-【第二層 每日配額】每 IP 每日 /image 3 次、/fill 12 次(數字放 env vars)。
+【第二層 每日配額】每 IP 每日 /image 6 次、/fill 60 次(數字放 env vars,依漏斗轉換需要調整 — 額度太緊,使用者連桌布都生不出來,就更不會留 email)。
 扣額必須是一條原子 SQL:
 INSERT INTO quota_counts (day, ip, kind, count) VALUES (?, ?, ?, 1)
 ON CONFLICT(day, ip, kind) DO UPDATE SET count = count + 1

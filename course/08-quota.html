@@ -85,7 +85,7 @@ hr{border:none;border-top:1px solid var(--line);margin:32px 0}
 <tr>
 <td><code>POST /image</code>(AI 桌布背景)</td>
 <td>OpenAI Images API(按張計費);備援自架服務燒 ChatGPT 訂閱</td>
-<td>3 次</td>
+<td>6 次</td>
 </tr>
 <tr>
 <td><code>POST /signup</code>(email 留資)</td>
@@ -210,7 +210,7 @@ jobs(id 主鍵, ip, day, refunded 預設 0, created_at)
 https://challenges.cloudflare.com/turnstile/v0/siteverify 驗證。
 Secret 名稱 TURNSTILE_SECRET;未設定時跳過驗證並 console.warn(部署過渡期 fail-open)。
 
-【第二層 每日配額】每 IP 每日 /image 3 次、/fill 12 次(數字放 env vars)。
+【第二層 每日配額】每 IP 每日 /image 6 次、/fill 60 次(數字放 env vars,依漏斗轉換需要調整 — 額度太緊,使用者連桌布都生不出來,就更不會留 email)。
 扣額必須是一條原子 SQL:
 INSERT INTO quota_counts (day, ip, kind, count) VALUES (?, ?, ?, 1)
 ON CONFLICT(day, ip, kind) DO UPDATE SET count = count + 1
