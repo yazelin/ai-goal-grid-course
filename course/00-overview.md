@@ -49,7 +49,7 @@
 | 03 | AI 補格:Worker + LLM JSON 輸出 + prompt 設計 | `demos/02-ai-fill/` |
 | 04 | 圖片上傳與前端縮圖(FileReader / canvas / base64) | — |
 | 05 | AI 桌布背景:長任務 job + 輪詢 + 等待 UX | `demos/03-wallpaper/` |
-| 06 | canvas 文字合成(含「叫 AI 畫中文字」翻車示範) | `demos/03-wallpaper/` |
+| 06 | canvas 文字合成(文字=資料、背景=藝術;改字成本對照) | `demos/03-wallpaper/` |
 | 07 | AI 編輯迴圈:edit 端點 + 參考圖 + 可攜帶的 prompt | `demos/03-wallpaper/` |
 | 08 | 防刷與額度:Turnstile + 四層防線 | `demos/04-quota/` |
 | 09 | Email 收集與 admin 後台(D1 + CSV) | `demos/05-email/` |

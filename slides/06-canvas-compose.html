@@ -13,11 +13,11 @@
 <section class="slide">
   <p class="kicker">AI 互動行銷頁實戰 — 目標九宮格 — 第 06 章</p>
   <h1>canvas 文字合成:<br><em>AI 畫背景</em>,<em>canvas 畫字</em></h1>
-  <p class="sub">學完:親手重現「叫 AI 畫中文字」的翻車現場,然後用 canvas 把九宮格文字一字不差地疊在任何背景上,輸出可下載的 PNG 桌布。</p>
+  <p class="sub">學完:想清楚文字該讓 AI 畫還是程式畫(關鍵是改字成本),然後用 canvas 把九宮格文字一字不差地疊在任何背景上,輸出可下載的 PNG 桌布。</p>
 </section>
 
 <section class="slide">
-  <h2>先翻車給你看:叫 AI <em>連中文字一起畫</em></h2>
+  <h2>對照實驗:叫 AI <em>連中文字一起畫</em></h2>
   <pre>畫一張 3×3 的目標九宮格表格圖,深藍色底、金色框線。
 中央格寫「完成全馬 42.195km」,
 周圍八格依序寫:「每週跑 40km」「核心訓練」「睡滿 7 小時」
@@ -27,12 +27,14 @@
 </section>
 
 <section class="slide">
-  <h2>三種典型災難</h2>
+  <h2>新模型進步了,但決策點不在這</h2>
   <ul class="points">
     <li><strong>偽漢字</strong>:筆畫黏成字典裡不存在的字,遠看像中文、近看是亂碼</li>
     <li><strong>缺字、漏字、多字</strong>:「每週跑 40km」變成「每跑 40」</li>
     <li><strong>簡繁混雜</strong>:「週」變「周」、「練」變「练」,同一張圖兩種寫法</li>
-    <li>更麻煩:同一個 prompt 重抽三次,<strong>三次錯的地方都不一樣</strong></li>
+    <li>上面三種災難在新一代強模型(gpt-image 新版、Gemini 新繪圖模型)上已大幅改善</li>
+    <li>但真正的問題是:<strong>字烤進圖裡,改一個字 = 整張重生</strong>(時間 + 錢 + 構圖跟著變)</li>
+    <li>canvas 疊字:改字即時免費、100% 一字不差、版型有保證 —— <strong>文字是資料,背景是藝術</strong></li>
     <li>錯得不穩定 = <strong>無法驗收</strong> = 不能放上行銷頁(這還只是 9 格,進階模式是 81 格)</li>
   </ul>
 </section>

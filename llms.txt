@@ -23,7 +23,7 @@
 - 03 AI 補格(Worker + LLM JSON 輸出)
 - 04 圖片上傳與前端縮圖
 - 05 AI 桌布背景(非同步 job + 輪詢 + 長等待 UX)
-- 06 canvas 文字合成(含 AI 畫中文字翻車示範)
+- 06 canvas 文字合成(文字=資料、背景=藝術;改字成本對照)
 - 07 AI 編輯迴圈
 - 08 防刷與額度(Turnstile + D1 原子配額)
 - 09 Email 收集與 admin 後台
