@@ -3,7 +3,7 @@
 
 // Turnstile sitekey:留空 = 不掛 widget、不送 token(Worker 未設 secret 時相容)。
 // yazelin 申請好 sitekey 後填這裡,讓所有訪客直接生效(不必每人手動設定)。
-export const TURNSTILE_SITEKEY = '';
+export const TURNSTILE_SITEKEY = '0x4AAAAAADl5jxytMJKUiGN2';
 
 // 站方 Cloudflare Worker(/fill /image /signup /list)
 export const DEFAULT_WORKER_URL = 'https://goal-grid.yazelinj303.workers.dev';
