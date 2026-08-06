@@ -1,8 +1,8 @@
 // 步驟五:email 留資(Task 2.5)
 // 漏斗示範重點:免費價值先給(PNG 不設牆),留資換加值(30 天行動追蹤模板),
 // 註冊成功當場顯示 gift 連結 —— 承諾即時兌現,不依賴寄信。
-// honeypot:表單藏一個 name=company 的欄位(CSS 移出視野),真人不會填;
-// 有值就照常送出,Worker 端假裝成功但不寫入。
+// honeypot:表單藏一個 name=company 的 hidden 欄位(hidden 不會被瀏覽器自動填),
+// 有值就照常送出,Worker 端照收但標記 —— 不擋,免得誤判把真人丟掉。
 
 import * as api from './api.js';
 

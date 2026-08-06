@@ -595,13 +595,8 @@ section.step-enter > *:nth-child(7) { animation-delay: 0.30s; }
 .signup-form input:focus { border-color: var(--gold); }
 .signup-form input:disabled { opacity: 0.45; }
 
-/* honeypot:移出視野但仍在 DOM(真人看不到,機器人照填) */
-.signup-form .hp-field {
-  position: absolute; left: -9999px; top: 0;
-  width: 1px; height: 1px;
-  flex: none; min-width: 0;
-  opacity: 0; pointer-events: none;
-}
+/* honeypot 已改用 <input type="hidden">(移出視野的 text 欄位會被瀏覽器自動填,
+   曾經害真人送出後靜靜掉出名單),不再需要藏欄位的樣式。 */
 
 .gift { margin-top: 16px; }
 

@@ -524,7 +524,7 @@ export async function pollWallpaper(jobId, opts = {}) {
 
 // ---- email 留資 ----
 
-// company = honeypot 欄位:真人看不到也不會填;有值就原樣送出,由 Worker 回假成功擋機器人
+// company = honeypot 欄位:hidden,真人填不到;有值就原樣送出,由 Worker 標記(不擋)
 export async function signup(email, name, company = '', deps = {}) {
   const d = normDeps(deps);
   const payload = { email, name };
